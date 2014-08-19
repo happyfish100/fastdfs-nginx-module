@@ -1,0 +1,75 @@
+
+Version 1.16  2014-05-04
+ * mod_fastdfs.conf remove parameter: http.need_find_content_type
+ * bug fixed: remove flv duplicate start variable define
+ * flv support end parameter
+ * bug fixed: in function proxy_create_request, use r->unparsed_uri
+   when r->valid_unparsed_uri is true, otherwise use r->uri and r->args
+
+Version 1.15  2013-01-13
+ * add storage server port config with multi groups
+ * support flv, you must upgrade your FastDFS server to v4.06 
+   or higher version
+
+Version 1.14  2012-12-29
+ * bug fixed: do not check store path index when not same group
+   you must upgrade your FastDFS server to v4.05 or higher version
+ * proxy handler deal headers more gracefully
+ * set last modified time correctly
+ * support multi groups
+
+Version 1.13  2012-11-14
+ * support filename include storage server ID
+   must upgrade your FastDFS server to v4.03 or higher version
+ * call function fdfs_mod_init change from ngx_http_fastdfs_set to 
+   ngx_http_fastdfs_process_init
+
+Version 1.12  2012-10-20
+ * log detail error info when stat file fail
+ * mod_fastdfs.conf add parameter: load_fdfs_parameters_from_tracker, 
+   not load parameters from the FDFS tracker server by default
+
+Version 1.11  2012-08-27
+ * add more debug info
+ * use nginx error page when HTTP status is not ok
+
+Version 1.10  2012-01-03
+ * use r->uri and r->args instead of r->unparsed_uri to support 
+   rewrite correctly
+
+Version 1.09  2011-11-26
+ * bug fixed: correct HTTP status when nginx send file with range
+
+Version 1.08  2011-08-21
+ * add store path count in startup log info
+ * support HTTP range
+
+Version 1.07  2011-07-31
+ * add more error log
+ * bug fixed: miss sub dir data in data path
+
+Version 1.06  2011-06-11
+ * bug fixed: cross group does not proxy or redirect when the file upload
+   one day ago
+ * support trunk file (FastDFS server version >= 3.00)
+
+Version 1.05  2011-03-16
+ * support request header if_modified_since
+
+Version 1.04  2011-03-12
+ * support url parameter "filename" to specify attachment filename
+ * add Last-Modified header
+
+Version 1.03  2011-01-31
+ * use FastDFS V2.08 client library
+
+Version 1.02  2010-12-20
+ * fix signedness and signed assignment
+ * change ngx_http_fastdfs_proxy_handler return type from ngx_int_t to int
+
+Version 1.01  2010-11-15
+ *  use nginx proxy deal approach
+
+Version 1.00  2010-11-08
+ *  first version
+
