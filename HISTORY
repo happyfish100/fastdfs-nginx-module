@@ -1,4 +1,9 @@
 
+Version 1.17  2014-11-22
+ * change include path of fastcommon and fastdfs
+   you must upgrade your FastDFS server to v5.04
+   or higher version
+
 Version 1.16  2014-05-04
  * mod_fastdfs.conf remove parameter: http.need_find_content_type
  * bug fixed: remove flv duplicate start variable define
@@ -8,7 +13,7 @@ Version 1.16  2014-05-04
 
 Version 1.15  2013-01-13
  * add storage server port config with multi groups
- * support flv, you must upgrade your FastDFS server to v4.06 
+ * support flv, you must upgrade your FastDFS server to v4.06
    or higher version
 
 Version 1.14  2012-12-29
