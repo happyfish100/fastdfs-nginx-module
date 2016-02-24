@@ -1,4 +1,8 @@
 
+Version 1.18  2016-02-24
+ * bug fixed: do NOT use header_only field of request,
+   use method field instead
+
 Version 1.17  2014-11-22
  * change include path of fastcommon and fastdfs
    you must upgrade your FastDFS server to v5.04
