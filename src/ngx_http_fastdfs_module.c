@@ -880,7 +880,7 @@ static ngx_int_t ngx_http_fastdfs_handler(ngx_http_request_t *r)
 
 	memset(&context, 0, sizeof(context));
 	context.arg = r;
-	context.header_only = (r->method & NGX_HTTP_HEAD);
+	context.header_only = (r->method & NGX_HTTP_HEAD) ? 1 : 0;
 	context.url = url;
 	context.output_headers = fdfs_output_headers;
 	context.send_file = fdfs_send_file;
