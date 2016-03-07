@@ -1237,30 +1237,30 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		}
 	}
 
-	remain_bytes = download_bytes;
-	while (remain_bytes > 0)
-	{
-		read_bytes = remain_bytes <= FDFS_OUTPUT_CHUNK_SIZE ? \
-			     remain_bytes : FDFS_OUTPUT_CHUNK_SIZE;
-		if (read(fd, file_trunk_buff, read_bytes) != read_bytes)
-		{
-			close(fd);
-			logError("file: "__FILE__", line: %d, " \
-				"read from file %s fail, " \
-				"errno: %d, error info: %s", __LINE__, \
-				full_filename, errno, STRERROR(errno));
-			return HTTP_INTERNAL_SERVER_ERROR;
-		}
+    remain_bytes = download_bytes;
+    while (remain_bytes > 0)
+    {
+        read_bytes = remain_bytes <= FDFS_OUTPUT_CHUNK_SIZE ? \
+                     remain_bytes : FDFS_OUTPUT_CHUNK_SIZE;
+        if (read(fd, file_trunk_buff, read_bytes) != read_bytes)
+        {
+            close(fd);
+            logError("file: "__FILE__", line: %d, " \
+                    "read from file %s fail, " \
+                    "errno: %d, error info: %s", __LINE__, \
+                    full_filename, errno, STRERROR(errno));
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
 
-		remain_bytes -= read_bytes;
-		if (pContext->send_reply_chunk(pContext->arg, \
-			(remain_bytes == 0) ? 1: 0, file_trunk_buff, \
-			read_bytes) != 0)
-		{
-			close(fd);
-			return HTTP_INTERNAL_SERVER_ERROR;
-		}
-	}
+        remain_bytes -= read_bytes;
+        if (pContext->send_reply_chunk(pContext->arg, \
+                    (remain_bytes == 0) ? 1: 0, file_trunk_buff, \
+                    read_bytes) != 0)
+        {
+            close(fd);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+    }
 
 	close(fd);
 	return HTTP_OK;

@@ -221,6 +221,10 @@ static void fdfs_output_headers(void *arg, struct fdfs_http_response *pResponse)
 
 	r->headers_out.status = pResponse->status;
 	pResponse->header_outputed = true;
+    if (pResponse->content_length <= 0)
+    {
+        r->header_only = 1;
+    }
 	rc = ngx_http_send_header(r);
 	if (rc == NGX_ERROR || rc > NGX_OK)
 	{
