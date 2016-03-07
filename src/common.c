@@ -790,7 +790,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		return http_status;
 	}
 	
-	if (file_info.file_size >= 0)  //mormal file
+	if (file_info.file_size >= 0)  //normal file
 	{
 		FDFS_SET_LAST_MODIFIED(response, pContext, \
 				file_info.create_timestamp);

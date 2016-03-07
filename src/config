@@ -1,6 +1,6 @@
 ngx_addon_name=ngx_http_fastdfs_module
 
-if test -n ${ngx_module_link}; then
+if test -n "${ngx_module_link}"; then
     ngx_module_type=HTTP
     ngx_module_name=$ngx_addon_name
     ngx_module_incs="/usr/include/fastdfs /usr/include/fastcommon/"
