@@ -539,7 +539,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	char *file_id_without_group;
 	char *url;
 	char file_id[128];
-	char uri[256];
+	char uri[512];
 	int url_len;
 	int uri_len;
 	int flv_header_len;
