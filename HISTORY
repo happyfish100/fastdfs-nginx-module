@@ -1,4 +1,7 @@
 
+Version 1.19  2017-01-10
+ * change INT64_PRINTF_FORMAT to PRId64
+
 Version 1.18  2016-02-24
  * bug fixed: do NOT use header_only field of request,
    use method field instead

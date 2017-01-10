@@ -435,17 +435,17 @@ static void fdfs_format_range(const struct fdfs_http_range *range, \
 	if (range->start < 0)
 	{
 		pResponse->range_len = sprintf(pResponse->range, \
-			"bytes="INT64_PRINTF_FORMAT, range->start);
+			"bytes=%"PRId64, range->start);
 	}
 	else if (range->end == 0)
 	{
 		pResponse->range_len = sprintf(pResponse->range, \
-			"bytes="INT64_PRINTF_FORMAT"-", range->start);
+			"bytes=%"PRId64"-", range->start);
 	}
 	else
 	{
 		pResponse->range_len = sprintf(pResponse->range, \
-			"bytes="INT64_PRINTF_FORMAT"-"INT64_PRINTF_FORMAT, \
+			"bytes=%"PRId64"-%"PRId64, \
 			range->start, range->end);
 	}
 }
@@ -454,8 +454,8 @@ static void fdfs_format_content_range(const struct fdfs_http_range *range, \
 	const int64_t file_size, struct fdfs_http_response *pResponse)
 {
 	pResponse->content_range_len = sprintf(pResponse->content_range, \
-		"bytes "INT64_PRINTF_FORMAT"-"INT64_PRINTF_FORMAT \
-		"/"INT64_PRINTF_FORMAT, range->start, range->end, file_size);
+		"bytes %"PRId64"-%"PRId64 \
+		"/%"PRId64, range->start, range->end, file_size);
 }
 
 static int fdfs_check_and_format_range(struct fdfs_http_range *range, 
@@ -468,7 +468,7 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 		if (start < 0)
 		{
 			logError("file: "__FILE__", line: %d, " \
-				"invalid range value: "INT64_PRINTF_FORMAT, \
+				"invalid range value: %"PRId64, \
 				__LINE__, range->start);
 			return EINVAL;
 		}
@@ -477,8 +477,8 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 	else if (range->start >= file_size)
 	{
 		logError("file: "__FILE__", line: %d, " \
-			"invalid range start value: "INT64_PRINTF_FORMAT \
-			", exceeds file size: "INT64_PRINTF_FORMAT, \
+			"invalid range start value: %"PRId64 \
+			", exceeds file size: %"PRId64, \
 			__LINE__, range->start, file_size);
 		return EINVAL;
 	}
@@ -490,8 +490,8 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 	else if (range->end >= file_size)
 	{
 		logError("file: "__FILE__", line: %d, " \
-			"invalid range end value: "INT64_PRINTF_FORMAT \
-			", exceeds file size: "INT64_PRINTF_FORMAT, \
+			"invalid range end value: %"PRId64 \
+			", exceeds file size: %"PRId64, \
 			__LINE__, range->end, file_size);
 		return EINVAL;
 	}
@@ -499,8 +499,8 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 	if (range->start > range->end)
 	{
 		logError("file: "__FILE__", line: %d, " \
-			"invalid range value, start: "INT64_PRINTF_FORMAT \
-			", exceeds end: "INT64_PRINTF_FORMAT, \
+			"invalid range value, start: %"PRId64 \
+			", exceeds end: %"PRId64, \
 			__LINE__, range->start, range->end);
 		return EINVAL;
 	}
