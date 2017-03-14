@@ -1,6 +1,7 @@
 
-Version 1.19  2017-01-10
+Version 1.19  2017-03-14
  * change INT64_PRINTF_FORMAT to PRId64
+ * ignore range->end >= file_size
 
 Version 1.18  2016-02-24
  * bug fixed: do NOT use header_only field of request,

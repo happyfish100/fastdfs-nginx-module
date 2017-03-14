@@ -467,10 +467,10 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 		start = range->start + file_size;
 		if (start < 0)
 		{
-			logError("file: "__FILE__", line: %d, " \
-				"invalid range value: %"PRId64, \
+			logWarning("file: "__FILE__", line: %d, " \
+				"invalid range value: %"PRId64", set to 0", \
 				__LINE__, range->start);
-			return EINVAL;
+            start = 0;
 		}
 		range->start = start;
 	}
@@ -489,11 +489,11 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 	}
 	else if (range->end >= file_size)
 	{
-		logError("file: "__FILE__", line: %d, " \
+		logWarning("file: "__FILE__", line: %d, " \
 			"invalid range end value: %"PRId64 \
 			", exceeds file size: %"PRId64, \
 			__LINE__, range->end, file_size);
-		return EINVAL;
+		range->end = file_size - 1;
 	}
 
 	if (range->start > range->end)
