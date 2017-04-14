@@ -781,6 +781,10 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		{
 			http_status = HTTP_NOTFOUND;
 		}
+        else if (result == EINVAL)
+		{
+			http_status = HTTP_BADREQUEST;
+        }
 		else
 		{
 			http_status = HTTP_INTERNAL_SERVER_ERROR;
