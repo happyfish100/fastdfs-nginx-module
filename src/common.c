@@ -34,7 +34,15 @@
 #define FDFS_MOD_REPONSE_MODE_PROXY	'P'
 #define FDFS_MOD_REPONSE_MODE_REDIRECT	'R'
 
+
+#define FDFS_CONTENT_TYPE_TAG_STR   "Content-type: "
+#define FDFS_CONTENT_TYPE_TAG_LEN   (sizeof(FDFS_CONTENT_TYPE_TAG_STR) - 1)
+#define FDFS_CONTENT_RANGE_TAG_STR  "Content-range: "
+#define FDFS_CONTENT_RANGE_TAG_LEN  (sizeof(FDFS_CONTENT_RANGE_TAG_STR) - 1)
+
 static char  flv_header[] = "FLV\x1\x1\0\0\0\x9\0\0\0\x9";
+
+#define FDFS_RANGE_LENGTH(range) ((range.end - range.start) + 1)
 
 typedef struct tagGroupStorePaths {
 	char group_name[FDFS_GROUP_NAME_MAX_LEN + 1];
@@ -405,60 +413,219 @@ int fdfs_mod_init()
 }
 
 #define OUTPUT_HEADERS(pContext, pResponse, http_status) \
-	pResponse->status = http_status;  \
-	pContext->output_headers(pContext->arg, pResponse);
+    do { \
+        (pResponse)->status = http_status;  \
+        pContext->output_headers(pContext->arg, pResponse); \
+    } while (0)
+
+static int fdfs_send_boundary(struct fdfs_http_context *pContext,
+        struct fdfs_http_response *pResponse, const bool bLast)
+{
+    int result;
+
+    if ((result=pContext->send_reply_chunk(pContext->arg,
+                    false, "\r\n--", 4)) != 0)
+    {
+        return result;
+    }
+
+    if ((result=pContext->send_reply_chunk(pContext->arg,
+                    false, pResponse->boundary,
+                    pResponse->boundary_len)) != 0)
+    {
+        return result;
+    }
+
+    if (bLast)
+    {
+        result = pContext->send_reply_chunk(pContext->arg, true, "--\r\n", 4);
+    }
+    else
+    {
+        result = pContext->send_reply_chunk(pContext->arg, false, "\r\n", 2);
+    }
+    return result;
+}
+
+static int fdfs_send_range_subheader(struct fdfs_http_context *pContext,
+        struct fdfs_http_response *pResponse, const int index)
+{
+    char buff[256];
+    int len;
+
+    len = snprintf(buff, sizeof(buff), "%s%s\r\n%s%s\r\n\r\n",
+            FDFS_CONTENT_TYPE_TAG_STR, pResponse->range_content_type,
+            FDFS_CONTENT_RANGE_TAG_STR, pResponse->content_ranges[index].content);
+    return pContext->send_reply_chunk(pContext->arg, false, buff, len);
+}
 
 static int fdfs_download_callback(void *arg, const int64_t file_size, \
 		const char *data, const int current_size)
 {
 	struct fdfs_download_callback_args *pCallbackArgs;
+    int result;
+    bool bLast;
 
 	pCallbackArgs = (struct fdfs_download_callback_args *)arg;
 
 	if (!pCallbackArgs->pResponse->header_outputed)
 	{
-		pCallbackArgs->pResponse->content_length = file_size;
-		OUTPUT_HEADERS(pCallbackArgs->pContext, \
-			pCallbackArgs->pResponse, HTTP_OK)
+        if (!(pCallbackArgs->pContext->if_range &&
+                    pCallbackArgs->pContext->range_count > 1))
+        {
+            pCallbackArgs->pResponse->content_length = file_size;
+        }
+		OUTPUT_HEADERS(pCallbackArgs->pContext,
+                pCallbackArgs->pResponse, HTTP_OK);
 	}
 
+    if (pCallbackArgs->pContext->if_range && pCallbackArgs->
+            pContext->range_count > 1)
+    {
+        bLast = false;
+        if (pCallbackArgs->sent_bytes == 0)
+        {
+            if ((result=fdfs_send_boundary(pCallbackArgs->pContext,
+                        pCallbackArgs->pResponse, false)) != 0)
+            {
+                return result;
+            }
+            if ((result=fdfs_send_range_subheader(pCallbackArgs->pContext,
+                        pCallbackArgs->pResponse,
+                        pCallbackArgs->range_index)) != 0)
+            {
+                return result;
+            }
+        }
+    }
+    else
+    {
+        bLast = true;
+    }
+
 	pCallbackArgs->sent_bytes += current_size;
-	return pCallbackArgs->pContext->send_reply_chunk( \
-		pCallbackArgs->pContext->arg, \
-		(pCallbackArgs->sent_bytes == file_size) ? 1 : 0, \
+	return pCallbackArgs->pContext->send_reply_chunk(
+		pCallbackArgs->pContext->arg,
+		(pCallbackArgs->sent_bytes == file_size && bLast) ? 1 : 0,
 		data, current_size);
 }
 
-static void fdfs_format_range(const struct fdfs_http_range *range, \
+static void fdfs_do_format_range(const struct fdfs_http_range *range,
 	struct fdfs_http_response *pResponse)
 {
 	if (range->start < 0)
 	{
-		pResponse->range_len = sprintf(pResponse->range, \
-			"bytes=%"PRId64, range->start);
+		pResponse->range_len += sprintf(pResponse->range + pResponse->range_len, \
+			"%"PRId64, range->start);
 	}
 	else if (range->end == 0)
 	{
-		pResponse->range_len = sprintf(pResponse->range, \
-			"bytes=%"PRId64"-", range->start);
+		pResponse->range_len += sprintf(pResponse->range + pResponse->range_len, \
+			"%"PRId64"-", range->start);
 	}
 	else
 	{
-		pResponse->range_len = sprintf(pResponse->range, \
-			"bytes=%"PRId64"-%"PRId64, \
+		pResponse->range_len += sprintf(pResponse->range + pResponse->range_len, \
+			"%"PRId64"-%"PRId64, \
 			range->start, range->end);
 	}
 }
 
-static void fdfs_format_content_range(const struct fdfs_http_range *range, \
-	const int64_t file_size, struct fdfs_http_response *pResponse)
+static void fdfs_format_range(struct fdfs_http_context *pContext,
+	struct fdfs_http_response *pResponse)
 {
-	pResponse->content_range_len = sprintf(pResponse->content_range, \
-		"bytes %"PRId64"-%"PRId64 \
-		"/%"PRId64, range->start, range->end, file_size);
+    int i;
+    pResponse->range_len = sprintf(pResponse->range, "%s", "bytes=");
+    for (i=0; i<pContext->range_count; i++)
+    {
+        if (i > 0)
+        {
+            *(pResponse->range + pResponse->range_len) = ',';
+            pResponse->range_len++;
+        }
+        fdfs_do_format_range(pContext->ranges + i, pResponse);
+    }
 }
 
-static int fdfs_check_and_format_range(struct fdfs_http_range *range, 
+static void fdfs_do_format_content_range(const struct fdfs_http_range *range,
+	const int64_t file_size, struct fdfs_http_resp_content_range *content_range)
+{
+	content_range->length = sprintf(content_range->content,
+		"bytes %"PRId64"-%"PRId64"/%"PRId64,
+        range->start, range->end, file_size);
+}
+
+static void fdfs_format_content_range(struct fdfs_http_context *pContext,
+	const int64_t file_size, struct fdfs_http_response *pResponse)
+{
+    int i;
+    pResponse->content_range_count = pContext->range_count;
+    for (i=0; i<pContext->range_count; i++)
+    {
+        fdfs_do_format_content_range(pContext->ranges + i,
+                file_size, pResponse->content_ranges + i);
+    }
+}
+
+static int64_t fdfs_calc_download_bytes(struct fdfs_http_context *pContext)
+{
+    int64_t download_bytes;
+    int i;
+
+    download_bytes = 0;
+    for (i=0; i<pContext->range_count; i++)
+    {
+        download_bytes += FDFS_RANGE_LENGTH(pContext->ranges[i]);
+    }
+    return download_bytes;
+}
+
+static int fdfs_calc_content_length(struct fdfs_http_context *pContext,
+        const int64_t download_bytes, const int flv_header_len,
+        const char *ext_name, const int ext_len,
+        struct fdfs_http_response *pResponse)
+{
+    int result;
+    int i;
+    int content_type_part_len;
+    int boundary_part_len;
+
+    pResponse->content_length = download_bytes + flv_header_len;
+    if (pContext->if_range && pContext->range_count > 1)
+    {
+       pResponse->boundary_len = sprintf(pResponse->boundary,
+               "%"PRIx64, get_current_time_us());
+       sprintf(pResponse->content_type_buff,
+               "multipart/byteranges; boundary=%s",
+               pResponse->boundary);
+       pResponse->content_type = pResponse->content_type_buff;
+
+       if ((result=fdfs_http_get_content_type_by_extname(&g_http_params,
+                   ext_name, ext_len, pResponse->range_content_type,
+                   sizeof(pResponse->range_content_type))) != 0)
+       {
+           return result;
+       }
+
+       content_type_part_len = FDFS_CONTENT_TYPE_TAG_LEN +
+           strlen(pResponse->range_content_type) + 2;
+       boundary_part_len = 4 + pResponse->boundary_len + 2;
+
+       pResponse->content_length += (pContext->range_count + 1) * boundary_part_len;
+       pResponse->content_length += pContext->range_count * content_type_part_len;
+       for (i=0; i<pContext->range_count; i++)
+       {
+           pResponse->content_length += FDFS_CONTENT_RANGE_TAG_LEN +
+               pResponse->content_ranges[i].length + 4;
+       }
+
+       pResponse->content_length += 2; //last --
+    }
+
+    return 0;
+}
+
+static int fdfs_do_check_and_format_range(struct fdfs_http_range *range, 
 	const int64_t file_size)
 {
 	if (range->start < 0)
@@ -508,6 +675,24 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 	return 0;
 }
 
+static int fdfs_check_and_format_range(struct fdfs_http_context *pContext,
+	const int64_t file_size)
+{
+    int result;
+    int i;
+
+    result = 0;
+    for (i=0; i<pContext->range_count; i++)
+    {
+        if ((result=fdfs_do_check_and_format_range(pContext->ranges + i, file_size)) != 0)
+        {
+            return result;
+        }
+    }
+
+    return 0;
+}
+
 #define FDFS_SET_LAST_MODIFIED(response, pContext, mtime) \
 	do { \
 		response.last_modified = mtime; \
@@ -519,7 +704,7 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 			if (strcmp(response.last_modified_buff, \
 				pContext->if_modified_since) == 0) \
 			{ \
-			OUTPUT_HEADERS(pContext, (&response), HTTP_NOTMODIFIED)\
+			OUTPUT_HEADERS(pContext, (&response), HTTP_NOTMODIFIED);\
 			return HTTP_NOTMODIFIED; \
 			} \
 		} \
@@ -532,6 +717,42 @@ static int fdfs_check_and_format_range(struct fdfs_http_range *range,
 			pContext->if_modified_since)); \
 		*/ \
 	} while (0)
+
+static int fdfs_send_file_buffer(struct fdfs_http_context *pContext,
+        const char *full_filename, int fd,
+        const int64_t download_bytes, const bool bLast)
+{
+	char file_trunk_buff[FDFS_OUTPUT_CHUNK_SIZE];
+	off_t remain_bytes;
+	int read_bytes;
+    int result;
+
+    remain_bytes = download_bytes;
+    while (remain_bytes > 0)
+    {
+        read_bytes = remain_bytes <= FDFS_OUTPUT_CHUNK_SIZE ? \
+                     remain_bytes : FDFS_OUTPUT_CHUNK_SIZE;
+        if (read(fd, file_trunk_buff, read_bytes) != read_bytes)
+        {
+            result = errno != 0 ? errno : EIO;
+            logError("file: "__FILE__", line: %d, " \
+                    "read from file %s fail, " \
+                    "errno: %d, error info: %s", __LINE__, \
+                    full_filename, result, STRERROR(result));
+            return result;
+        }
+
+        remain_bytes -= read_bytes;
+        if ((result=pContext->send_reply_chunk(pContext->arg,
+                    (remain_bytes == 0 && bLast) ? 1: 0, file_trunk_buff,
+                    read_bytes)) != 0)
+        {
+            return result;
+        }
+    }
+
+    return 0;
+}
 
 int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 {
@@ -553,13 +774,10 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	char true_filename[128];
 	char full_filename[MAX_PATH_SIZE + 64];
 	//char content_type[64];
-	char file_trunk_buff[FDFS_OUTPUT_CHUNK_SIZE];
 	struct stat file_stat;
 	int64_t file_offset;
 	int64_t file_size;
 	int64_t download_bytes;
-	off_t remain_bytes;
-	int read_bytes;
 	int filename_len;
 	int full_filename_len;
 	int store_path_index;
@@ -567,6 +785,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	int result;
 	int http_status;
 	int the_storage_port;
+    int i;
 	struct fdfs_http_response response;
 	FDFSFileInfo file_info;
 	bool bFileExists;
@@ -584,7 +803,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	{
 		logError("file: "__FILE__", line: %d, " \
 			"url length: %d < 16", __LINE__, url_len);
-		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 		return HTTP_BADREQUEST;
 	}
 
@@ -595,7 +814,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		{
 			logError("file: "__FILE__", line: %d, " \
 				"invalid url: %s", __LINE__, pContext->url);
-			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 			return HTTP_BADREQUEST;
 		}
 
@@ -613,7 +832,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		logError("file: "__FILE__", line: %d, " \
 			"uri length: %d is too long, >= %d", __LINE__, \
 			uri_len, (int)sizeof(uri));
-		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 		return HTTP_BADREQUEST;
 	}
 
@@ -640,7 +859,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		{
 			logError("file: "__FILE__", line: %d, " \
 				"no group name in url, uri: %s", __LINE__, uri);
-			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 			return HTTP_BADREQUEST;
 		}
 
@@ -690,7 +909,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			"file id is too short, length: %d < 22, " \
 			"uri: %s", __LINE__, \
 			(int)strlen(file_id_without_group), uri);
-		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 		return HTTP_BADREQUEST;
 	}
 
@@ -707,7 +926,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			logError("file: "__FILE__", line: %d, " \
 				"expect parameter token or ts in url, " \
 				"uri: %s", __LINE__, uri);
-			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 			return HTTP_BADREQUEST;
 		}
 
@@ -727,7 +946,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 						token_check_fail_buff.length;
 				response.content_type = g_http_params. \
 						token_check_fail_content_type;
-				OUTPUT_HEADERS(pContext, (&response), HTTP_OK)
+				OUTPUT_HEADERS(pContext, (&response), HTTP_OK);
 
 				pContext->send_reply_chunk(pContext->arg, 1, \
 					g_http_params.token_check_fail_buff.buff, 
@@ -737,7 +956,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			}
 			else
 			{
-				OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+				OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 				return HTTP_BADREQUEST;
 			}
 		}
@@ -750,7 +969,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	if (storage_split_filename_no_check(filename, \
 		&filename_len, true_filename, &store_path_index) != 0)
 	{
-		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 		return HTTP_BADREQUEST;
 	}
 	if (bSameGroup)
@@ -764,14 +983,14 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				"which < 0 or >= %d", __LINE__, filename, \
 				store_path_index, pStorePaths->count);
 
-			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 			return HTTP_BADREQUEST;
 		}
 	}
 
 	if (fdfs_check_data_filename(true_filename, filename_len) != 0)
 	{
-		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+		OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 		return HTTP_BADREQUEST;
 	}
 
@@ -790,7 +1009,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			http_status = HTTP_INTERNAL_SERVER_ERROR;
 		}
 
-		OUTPUT_HEADERS(pContext, (&response), http_status)
+		OUTPUT_HEADERS(pContext, (&response), http_status);
 		return http_status;
 	}
 	
@@ -883,7 +1102,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				}
 			}
 
-			OUTPUT_HEADERS(pContext, (&response), HTTP_NOTFOUND)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_NOTFOUND);
 			return HTTP_NOTFOUND;
 		}
 
@@ -895,7 +1114,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				"redirect again, url: %s", \
 				__LINE__, url);
 
-			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 			return HTTP_BADREQUEST;
 		}
 
@@ -906,8 +1125,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				"id: %d, url: %s", __LINE__, \
 				file_info.source_id, url);
 
-			OUTPUT_HEADERS(pContext, (&response), \
-				HTTP_INTERNAL_SERVER_ERROR)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_INTERNAL_SERVER_ERROR);
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
@@ -958,9 +1176,9 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 
 			if (pContext->if_range)
 			{
-				fdfs_format_range(&(pContext->range), &response);
+				fdfs_format_range(pContext, &response);
 			}
-			OUTPUT_HEADERS(pContext, (&response), HTTP_MOVETEMP)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_MOVETEMP);
 			return HTTP_MOVETEMP;
 		}
 		else if (pContext->proxy_handler != NULL)
@@ -982,7 +1200,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		{
 			close(fd);
 		}
-		OUTPUT_HEADERS(pContext, (&response), HTTP_SERVUNAVAIL)
+		OUTPUT_HEADERS(pContext, (&response), HTTP_SERVUNAVAIL);
 		return HTTP_SERVUNAVAIL;
 	}
 	response.content_type = content_type;
@@ -1012,7 +1230,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 					http_status = HTTP_INTERNAL_SERVER_ERROR;
 				}
 
-				OUTPUT_HEADERS(pContext, (&response), http_status)
+				OUTPUT_HEADERS(pContext, (&response), http_status);
 				return http_status;
 			}
 		}
@@ -1023,21 +1241,27 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	flv_header_len = 0;
 	if (pContext->if_range)
 	{
-		if (fdfs_check_and_format_range(&(pContext->range), \
-			file_size) != 0)
+		if (fdfs_check_and_format_range(pContext, file_size) != 0 ||
+                (pContext->range_count > 1 && !g_http_params.support_multi_range))
 		{
 			if (fd >= 0)
 			{
 				close(fd);
 			}
 
-			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 			return HTTP_BADREQUEST;
 		}
 
-		download_bytes = (pContext->range.end - pContext->range.start) + 1;
-		fdfs_format_content_range(&(pContext->range), \
-					file_size, &response);
+        if (pContext->range_count == 1)
+        {
+            download_bytes = FDFS_RANGE_LENGTH(pContext->ranges[0]);
+        }
+        else
+        {
+            download_bytes = fdfs_calc_download_bytes(pContext);
+        }
+		fdfs_format_content_range(pContext, file_size, &response);
 	}
 	else
 	{
@@ -1057,8 +1281,9 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				{
 					char *pEnd;
 
-					pContext->range.start = start;
-					pContext->range.end = 0;
+                    pContext->range_count = 1;
+					pContext->ranges[0].start = start;
+					pContext->ranges[0].end = 0;
 					pEnd = fdfs_http_get_parameter("end", \
 						params, param_count);
 					if (pEnd != NULL)
@@ -1066,23 +1291,22 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 						int64_t end;
 						if (fdfs_strtoll(pEnd, &end) == 0)
 						{
-							pContext->range.end = end - 1;
+							pContext->ranges[0].end = end - 1;
 						}
 					}
 
-					if (fdfs_check_and_format_range(&(pContext->range), \
-						file_size) != 0)
+					if (fdfs_check_and_format_range(pContext, file_size) != 0)
 					{
 						if (fd >= 0)
 						{
 							close(fd);
 						}
 
-						OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST)
+						OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
 						return HTTP_BADREQUEST;
 					}
 
-					download_bytes = (pContext->range.end - pContext->range.start) + 1;
+					download_bytes = FDFS_RANGE_LENGTH(pContext->ranges[0]);
 					if (start > 0)
 					{
 						flv_header_len = sizeof(flv_header) - 1;
@@ -1100,12 +1324,25 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		{
 			close(fd);
 		}
-		response.content_length = download_bytes + flv_header_len;
+
+        if (fdfs_calc_content_length(pContext, download_bytes, flv_header_len,
+                    ext_name, ext_len, &response) != 0)
+        {
+            OUTPUT_HEADERS(pContext, (&response), HTTP_SERVUNAVAIL);
+                return HTTP_SERVUNAVAIL;
+        }
 		OUTPUT_HEADERS(pContext, (&response), pContext->if_range ? \
-			HTTP_PARTIAL_CONTENT : HTTP_OK )
+			HTTP_PARTIAL_CONTENT : HTTP_OK );
 
 		return HTTP_OK;
 	}
+
+    if (fdfs_calc_content_length(pContext, download_bytes, flv_header_len,
+                ext_name, ext_len, &response) != 0)
+    {
+        OUTPUT_HEADERS(pContext, (&response), HTTP_SERVUNAVAIL);
+            return HTTP_SERVUNAVAIL;
+    }
 
 	if (!bFileExists)
 	{
@@ -1120,11 +1357,16 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		callback_args.pContext = pContext;
 		callback_args.pResponse = &response;
 		callback_args.sent_bytes = 0;
+		callback_args.range_index = 0;
 
-		result = storage_download_file_ex1(NULL, \
-                	&storage_server, file_id, \
-                	pContext->range.start, download_bytes, \
-			fdfs_download_callback, &callback_args, &file_size);
+        if (pContext->if_range)
+        {
+            download_bytes = FDFS_RANGE_LENGTH(pContext->ranges[0]);
+        }
+        result = storage_download_file_ex1(NULL, \
+                &storage_server, file_id, \
+                pContext->ranges[0].start, download_bytes, \
+                fdfs_download_callback, &callback_args, &file_size);
 
 		logDebug("file: "__FILE__", line: %d, " \
 			"storage_download_file_ex1 return code: %d, " \
@@ -1143,7 +1385,34 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			http_status = HTTP_INTERNAL_SERVER_ERROR;
 		}
 
-		OUTPUT_HEADERS(pContext, (&response), http_status)
+		OUTPUT_HEADERS(pContext, (&response), http_status);
+
+        if (result != 0 || !(pContext->if_range && pContext->range_count > 1))
+        {
+            return http_status;
+        }
+
+        for (i=1; i<pContext->range_count; i++)
+        {
+            callback_args.sent_bytes = 0;
+            callback_args.range_index = i;
+
+            download_bytes = FDFS_RANGE_LENGTH(pContext->ranges[i]);
+            result = storage_download_file_ex1(NULL,
+                    &storage_server, file_id,
+                    pContext->ranges[i].start, download_bytes,
+                    fdfs_download_callback, &callback_args, &file_size);
+            if (result != 0)
+            {
+                return HTTP_INTERNAL_SERVER_ERROR;
+            }
+        }
+
+        if (fdfs_send_boundary(pContext, &response, true) != 0)
+        {
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+
 		return http_status;
 	}
 
@@ -1154,7 +1423,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				full_filename, sizeof(full_filename));
 		full_filename_len = strlen(full_filename);
 		file_offset = TRUNK_FILE_START_OFFSET(trunkInfo) + \
-				pContext->range.start;
+				pContext->ranges[0].start;
 	}
 	else
 	{
@@ -1162,15 +1431,15 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				sizeof(full_filename), "%s/data/%s", \
 				pStorePaths->paths[store_path_index], \
 				true_filename);
-		file_offset = pContext->range.start;
+		file_offset = pContext->ranges[0].start;
 	}
 
-	response.content_length = download_bytes + flv_header_len;
-	if (pContext->send_file != NULL && !bTrunkFile)
+    if (pContext->send_file != NULL && !bTrunkFile &&
+            !(pContext->if_range && pContext->range_count > 1))
 	{
 		http_status = pContext->if_range ? \
 				HTTP_PARTIAL_CONTENT : HTTP_OK;
-		OUTPUT_HEADERS(pContext, (&response), http_status)
+		OUTPUT_HEADERS(pContext, (&response), http_status);
 
 		if (flv_header_len > 0)
 		{
@@ -1196,7 +1465,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				"errno: %d, error info: %s", __LINE__, \
 				full_filename, errno, STRERROR(errno));
 				OUTPUT_HEADERS(pContext, (&response), \
-						HTTP_SERVUNAVAIL)
+						HTTP_SERVUNAVAIL);
 			return HTTP_SERVUNAVAIL;
 		}
 		if (file_offset > 0 && lseek(fd, file_offset, SEEK_SET) < 0)
@@ -1207,15 +1476,14 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				"errno: %d, error info: %s", \
 				__LINE__, full_filename, \
 				errno, STRERROR(errno));
-			OUTPUT_HEADERS(pContext, (&response), \
-					HTTP_INTERNAL_SERVER_ERROR)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_INTERNAL_SERVER_ERROR);
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 	}
 	else
 	{
-		if (pContext->range.start > 0 && \
-			lseek(fd, pContext->range.start, SEEK_CUR) < 0)
+		if (pContext->ranges[0].start > 0 && \
+			lseek(fd, pContext->ranges[0].start, SEEK_CUR) < 0)
 		{
 			close(fd);
 			logError("file: "__FILE__", line: %d, " \
@@ -1223,14 +1491,27 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				"errno: %d, error info: %s", \
 				__LINE__, full_filename, \
 				errno, STRERROR(errno));
-			OUTPUT_HEADERS(pContext, (&response), \
-					HTTP_INTERNAL_SERVER_ERROR)
+			OUTPUT_HEADERS(pContext, (&response), HTTP_INTERNAL_SERVER_ERROR);
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 	}
 
 	OUTPUT_HEADERS(pContext, (&response), pContext->if_range ? \
-                        HTTP_PARTIAL_CONTENT : HTTP_OK)
+                        HTTP_PARTIAL_CONTENT : HTTP_OK);
+    if (pContext->if_range && pContext->range_count > 1)
+    {
+        if (fdfs_send_boundary(pContext, &response, false) != 0)
+        {
+            close(fd);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+        if (fdfs_send_range_subheader(pContext, &response, 0) != 0)
+        {
+            close(fd);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+    }
+
 	if (flv_header_len > 0)
 	{
 		if (pContext->send_reply_chunk(pContext->arg, \
@@ -1241,25 +1522,59 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		}
 	}
 
-    remain_bytes = download_bytes;
-    while (remain_bytes > 0)
+    if (pContext->if_range)
     {
-        read_bytes = remain_bytes <= FDFS_OUTPUT_CHUNK_SIZE ? \
-                     remain_bytes : FDFS_OUTPUT_CHUNK_SIZE;
-        if (read(fd, file_trunk_buff, read_bytes) != read_bytes)
+        download_bytes = FDFS_RANGE_LENGTH(pContext->ranges[0]);
+    }
+    if (fdfs_send_file_buffer(pContext, full_filename, fd, download_bytes,
+                !(pContext->if_range && pContext->range_count > 1)) != 0)
+    {
+        close(fd);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    if (!(pContext->if_range && pContext->range_count > 1))
+    {
+        close(fd);
+        return HTTP_OK;
+    }
+
+    for (i=1; i<pContext->range_count; i++)
+    {
+        if (bTrunkFile)
+        {
+            file_offset = TRUNK_FILE_START_OFFSET(trunkInfo) +
+                pContext->ranges[i].start;
+        }
+        else
+        {
+            file_offset = pContext->ranges[i].start;
+        }
+
+		if (lseek(fd, file_offset, SEEK_SET) < 0)
+		{
+			close(fd);
+			logError("file: "__FILE__", line: %d, " \
+				"lseek file: %s fail, " \
+				"errno: %d, error info: %s", \
+				__LINE__, full_filename, \
+				errno, STRERROR(errno));
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+
+        if (fdfs_send_boundary(pContext, &response, false) != 0)
         {
             close(fd);
-            logError("file: "__FILE__", line: %d, " \
-                    "read from file %s fail, " \
-                    "errno: %d, error info: %s", __LINE__, \
-                    full_filename, errno, STRERROR(errno));
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+        if (fdfs_send_range_subheader(pContext, &response, i) != 0)
+        {
+            close(fd);
             return HTTP_INTERNAL_SERVER_ERROR;
         }
 
-        remain_bytes -= read_bytes;
-        if (pContext->send_reply_chunk(pContext->arg, \
-                    (remain_bytes == 0) ? 1: 0, file_trunk_buff, \
-                    read_bytes) != 0)
+        if (fdfs_send_file_buffer(pContext, full_filename, fd,
+                    FDFS_RANGE_LENGTH(pContext->ranges[i]), false) != 0)
         {
             close(fd);
             return HTTP_INTERNAL_SERVER_ERROR;
@@ -1267,6 +1582,11 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
     }
 
 	close(fd);
+    if (fdfs_send_boundary(pContext, &response, true) != 0)
+    {
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
 	return HTTP_OK;
 }
 
@@ -1315,33 +1635,14 @@ static int fdfs_format_http_datetime(time_t t, char *buff, const int buff_size)
 	return 0;
 }
 
-int fdfs_parse_range(const char *value, struct fdfs_http_range *range)
+static int fdfs_parse_range(char *value, struct fdfs_http_range *range)
 {
-/*
-range format:
-bytes=500-999
-bytes=-500
-bytes=9500-
-*/
-#define RANGE_PREFIX_STR  "bytes="
-#define RANGE_PREFIX_LEN   (int)(sizeof(RANGE_PREFIX_STR) - 1)
-
-	int len;
 	int result;
-	const char *p;
-	const char *pEndPos;
-	char buff[32];
+    char *pEndPos;
 
-	len = strlen(value);
-	if (len <= RANGE_PREFIX_LEN + 1)
+	if (*value == '-')
 	{
-		return EINVAL;
-	}
-
-	p = value + RANGE_PREFIX_LEN;
-	if (*p == '-')
-	{
-		if ((result=fdfs_strtoll(p, &(range->start))) != 0)
+		if ((result=fdfs_strtoll(value, &(range->start))) != 0)
 		{
 			return result;
 		}
@@ -1349,20 +1650,14 @@ bytes=9500-
 		return 0;
 	}
 
-	pEndPos = strchr(p, '-');
+	pEndPos = strchr(value, '-');
 	if (pEndPos == NULL)
 	{
 		return EINVAL;
 	}
 
-	len = pEndPos - p;
-	if (len >= (int)sizeof(buff))
-	{
-		return EINVAL;
-	}
-	memcpy(buff, p, len);
-	*(buff + len) = '\0';
-	if ((result=fdfs_strtoll(buff, &(range->start))) != 0)
+    *pEndPos = '\0';
+	if ((result=fdfs_strtoll(value, &(range->start))) != 0)
 	{
 		return result;
 	}
@@ -1383,3 +1678,48 @@ bytes=9500-
 	return 0;
 }
 
+int fdfs_parse_ranges(const char *value, struct fdfs_http_context *pContext)
+{
+/*
+range format:
+bytes=500-999
+bytes=-500
+bytes=9500-
+*/
+#define RANGE_PREFIX_STR  "bytes="
+#define RANGE_PREFIX_LEN   (int)(sizeof(RANGE_PREFIX_STR) - 1)
+
+    int result;
+	int len;
+    int i;
+	const char *p;
+	char buff[256];
+    char *parts[FDFS_MAX_HTTP_RANGES];
+
+	len = strlen(value);
+	if (len <= RANGE_PREFIX_LEN + 1)
+	{
+		return EINVAL;
+	}
+
+	p = value + RANGE_PREFIX_LEN;
+    len -= RANGE_PREFIX_LEN;
+	if (len >= (int)sizeof(buff))
+	{
+		return EINVAL;
+	}
+	memcpy(buff, p, len);
+	*(buff + len) = '\0';
+
+    result = 0;
+    pContext->range_count = splitEx(buff, ',', parts, FDFS_MAX_HTTP_RANGES);
+    for (i=0; i<pContext->range_count; i++)
+    {
+        if ((result=fdfs_parse_range(parts[i], pContext->ranges + i)) != 0)
+        {
+            break;
+        }
+    }
+
+    return result;
+}

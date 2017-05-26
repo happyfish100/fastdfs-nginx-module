@@ -1,4 +1,7 @@
 
+Version 1.20  2017-05-26
+ * support multi regions for HTTP Range
+
 Version 1.19  2017-04-14
  * change INT64_PRINTF_FORMAT to PRId64
  * ignore range->end >= file_size

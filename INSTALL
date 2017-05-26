@@ -6,18 +6,18 @@ English language: http://english.csource.org/
 Chinese language: http://www.csource.org/
 
 #step 1. first install the FastDFS storage server and client library,
-         the FastDFS version should >= 2.09. download address:
-         https://code.google.com/p/fastdfs/downloads/list
+         the FastDFS version should >= 5.11. download address:
+         https://github.com/happyfish100/fastdfs
 
 #step 2. install nginx server
-         FastDFS nginx module test passed with nginx 0.8.53,
+         FastDFS nginx module test passed with nginx 1.8.1,
          my nginx installed in /usr/local/nginx
 
 #step 3. download FastDFS nginx module source package and unpack it, such as:
-tar xzf fastdfs_nginx_module_v1.16.tar.gz
+tar xzf fastdfs_nginx_module_v1.20.tar.gz
 
 #step 4. enter the nginx source dir, compile and install the module, such as:
-cd nginx-1.5.12
+cd nginx-1.8.1
 ./configure --add-module=/home/yuqing/fastdfs-nginx-module/src
 make; make install
 

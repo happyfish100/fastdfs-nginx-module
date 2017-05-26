@@ -131,8 +131,8 @@ static ngx_int_t fdfs_set_content_range(ngx_http_request_t *r, \
 			struct fdfs_http_response *pResponse)
 {
 	return fdfs_set_header(r, "Content-Range", "content-range", \
-		sizeof("Content-Range") - 1, pResponse->content_range, \
-		pResponse->content_range_len);
+		sizeof("Content-Range") - 1, pResponse->content_ranges[0].content, \
+		pResponse->content_ranges[0].length);
 }
 
 static ngx_int_t fdfs_set_accept_ranges(ngx_http_request_t *r)
@@ -211,7 +211,7 @@ static void fdfs_output_headers(void *arg, struct fdfs_http_response *pResponse)
 
 		r->headers_out.last_modified_time = pResponse->last_modified;
 		fdfs_set_accept_ranges(r);
-		if (pResponse->content_range_len > 0)
+		if (pResponse->content_range_count == 1)
 		{
 			fdfs_set_content_range(r, pResponse);
 		}
@@ -928,7 +928,7 @@ static ngx_int_t ngx_http_fastdfs_handler(ngx_http_request_t *r)
 				r->headers_in.range->value.len);
 		*(buff + r->headers_in.range->value.len) = '\0';
 		//ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "buff=%s", buff);
-		if (fdfs_parse_range(buff, &(context.range)) != 0)
+		if (fdfs_parse_ranges(buff, &context) != 0)
 		{
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, \
 				"bad request, invalid range: %s", buff);
