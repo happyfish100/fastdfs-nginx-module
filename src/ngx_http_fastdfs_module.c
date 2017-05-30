@@ -932,7 +932,7 @@ static ngx_int_t ngx_http_fastdfs_handler(ngx_http_request_t *r)
 		{
 			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, \
 				"bad request, invalid range: %s", buff);
-			return NGX_HTTP_BAD_REQUEST;
+			return NGX_HTTP_RANGE_NOT_SATISFIABLE;
 		}
 		context.if_range = true;
 

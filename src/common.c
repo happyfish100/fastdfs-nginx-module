@@ -1249,8 +1249,8 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				close(fd);
 			}
 
-			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
-			return HTTP_BADREQUEST;
+			OUTPUT_HEADERS(pContext, (&response), HTTP_RANGE_NOT_SATISFIABLE);
+			return HTTP_RANGE_NOT_SATISFIABLE;
 		}
 
         if (pContext->range_count == 1)
