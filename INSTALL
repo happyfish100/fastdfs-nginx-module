@@ -10,14 +10,15 @@ Chinese language: http://www.csource.org/
          https://github.com/happyfish100/fastdfs
 
 #step 2. install nginx server
-         FastDFS nginx module test passed with nginx 1.8.1,
+         FastDFS nginx module test passed with nginx 1.15.1,
          my nginx installed in /usr/local/nginx
 
 #step 3. download FastDFS nginx module source package and unpack it, such as:
-tar xzf fastdfs_nginx_module_v1.20.tar.gz
+cd /home/yuqing
+git clone https://github.com/happyfish100/fastdfs
 
 #step 4. enter the nginx source dir, compile and install the module, such as:
-cd nginx-1.8.1
+cd nginx-1.15.1
 ./configure --add-module=/home/yuqing/fastdfs-nginx-module/src
 make; make install
 

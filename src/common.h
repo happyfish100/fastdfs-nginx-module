@@ -10,7 +10,7 @@
 #define FDFS_MOD_COMMON_H
 
 #include <time.h>
-#include "tracker_types.h"
+#include "fastdfs/tracker_types.h"
 
 #ifndef HTTP_OK
 #define HTTP_OK                    200

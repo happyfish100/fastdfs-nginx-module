@@ -18,17 +18,17 @@
 #include <limits.h>
 #include <time.h>
 #include <unistd.h>
-#include "fdfs_define.h"
-#include "logger.h"
-#include "shared_func.h"
-#include "fdfs_global.h"
-#include "sockopt.h"
-#include "http_func.h"
-#include "fdfs_http_shared.h"
-#include "fdfs_client.h"
-#include "local_ip_func.h"
-#include "fdfs_shared_func.h"
-#include "trunk_shared.h"
+#include "fastcommon/logger.h"
+#include "fastcommon/shared_func.h"
+#include "fastcommon/sockopt.h"
+#include "fastcommon/http_func.h"
+#include "fastcommon/local_ip_func.h"
+#include "fastdfs/fdfs_define.h"
+#include "fastdfs/fdfs_global.h"
+#include "fastdfs/fdfs_http_shared.h"
+#include "fastdfs/fdfs_client.h"
+#include "fastdfs/fdfs_shared_func.h"
+#include "fastdfs/trunk_shared.h"
 #include "common.h"
 
 #define FDFS_MOD_REPONSE_MODE_PROXY	'P'
