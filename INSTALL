@@ -37,8 +37,10 @@ CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -DFDFS_OUTPUT_CHUNK_SIZE='256*1024' -DFDF
          command line such as:
 ln -s /home/yuqing/fastdfs/data  /home/yuqing/fastdfs/data/M00
 
-#step 7. change the config file /etc/fdfs/mod_fastdfs.conf, more detail please see it
+#step 7. copy conf/http.conf in FastDFS source path to /etc/fdfs/ and modify it
 
-#step 8. restart the nginx server, such as:
+#step 8. change the config file /etc/fdfs/mod_fastdfs.conf, more detail please see it
+
+#step 9. restart the nginx server, such as:
 /usr/local/nginx/sbin/nginx -s stop; /usr/local/nginx/sbin/nginx
 
