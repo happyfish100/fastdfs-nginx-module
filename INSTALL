@@ -6,18 +6,18 @@ English language: http://english.csource.org/
 Chinese language: http://www.csource.org/
 
 #step 1. first install the FastDFS storage server and client library,
-         the FastDFS version should >= 5.11. download address:
-         https://github.com/happyfish100/fastdfs
+         the FastDFS version should >= 5.11. download with git:
+         git clone https://github.com/happyfish100/fastdfs
 
 #step 2. install nginx server
          FastDFS nginx module test passed with nginx 1.15.1,
          my nginx installed in /usr/local/nginx
 
-#step 3. download FastDFS nginx module source package and unpack it, such as:
+#step 3. download FastDFS nginx module source package, such as:
 cd /home/yuqing
-git clone https://github.com/happyfish100/fastdfs
+git clone https://github.com/happyfish100/fastdfs-nginx-module
 
-#step 4. enter the nginx source dir, compile and install the module, such as:
+#step 4. enter the nginx source dir, compile and install fastdfs module, such as:
 cd nginx-1.15.1
 ./configure --add-module=/home/yuqing/fastdfs-nginx-module/src
 make; make install
@@ -37,10 +37,15 @@ CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -DFDFS_OUTPUT_CHUNK_SIZE='256*1024' -DFDF
          command line such as:
 ln -s /home/yuqing/fastdfs/data  /home/yuqing/fastdfs/data/M00
 
-#step 7. copy conf/http.conf in FastDFS source path to /etc/fdfs/ and modify it
+#step 7. copy conf/http.conf and conf/mime.types in FastDFS source path to /etc/fdfs/ and modify http.conf, such as:
+cd /home/yuqing/fastdfs
+cp conf/http.conf conf/mime.types /etc/fdfs/
 
-#step 8. change the config file /etc/fdfs/mod_fastdfs.conf, more detail please see it
+#step 8. copy mod_fastdfs.conf to /etc/fdfs/ and modify it
 
 #step 9. restart the nginx server, such as:
 /usr/local/nginx/sbin/nginx -s stop; /usr/local/nginx/sbin/nginx
+
+#step 10. view nginx log file, such as:
+tail -n 100 /usr/local/logs/error.log
 
