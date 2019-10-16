@@ -6,7 +6,7 @@ English language: http://english.csource.org/
 Chinese language: http://www.csource.org/
 
 #step 1. first install the FastDFS storage server and client library,
-         the FastDFS version should >= 5.11. download with git:
+         the FastDFS version should >= 6.0.0. download with git:
          git clone https://github.com/happyfish100/fastdfs
 
 #step 2. install nginx server

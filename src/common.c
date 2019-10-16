@@ -352,39 +352,40 @@ int fdfs_mod_init()
 		}
 	}
 
-	logInfo("fastdfs apache / nginx module v1.15, " \
-		"response_mode=%s, " \
-		"base_path=%s, " \
-		"url_have_group_name=%d, " \
-		"%s" \
-		"connect_timeout=%d, "\
-		"network_timeout=%d, "\
-		"tracker_server_count=%d, " \
-		"if_alias_prefix=%s, " \
-		"local_host_ip_count=%d, " \
-		"anti_steal_token=%d, " \
-		"token_ttl=%ds, " \
-		"anti_steal_secret_key length=%d, "  \
-		"token_check_fail content_type=%s, " \
-		"token_check_fail buff length=%d, "  \
-		"load_fdfs_parameters_from_tracker=%d, " \
-		"storage_sync_file_max_delay=%ds, " \
-		"use_storage_id=%d, storage server id count=%d, " \
-		"flv_support=%d, flv_extension=%s", \
-		response_mode == FDFS_MOD_REPONSE_MODE_PROXY ? \
-			"proxy" : "redirect", \
-		g_fdfs_base_path, url_have_group_name, buff, \
-		g_fdfs_connect_timeout, g_fdfs_network_timeout, \
-		g_tracker_group.server_count, \
-		g_if_alias_prefix, g_local_host_ip_count, \
-		g_http_params.anti_steal_token, \
-		g_http_params.token_ttl, \
-		g_http_params.anti_steal_secret_key.length, \
-		g_http_params.token_check_fail_content_type, \
-		g_http_params.token_check_fail_buff.length, \
-		load_fdfs_parameters_from_tracker, \
-		storage_sync_file_max_delay, use_storage_id, \
-		g_storage_id_count, flv_support, flv_extension);
+	logInfo("fastdfs apache / nginx module v1.21, "
+		"response_mode=%s, "
+		"base_path=%s, "
+		"url_have_group_name=%d, "
+		"%s"
+		"connect_timeout=%d, "
+		"network_timeout=%d, "
+		"tracker_server_count=%d, "
+		"if_alias_prefix=%s, "
+		"local_host_ip_count=%d, "
+		"anti_steal_token=%d, "
+		"token_ttl=%ds, "
+		"anti_steal_secret_key length=%d, "
+		"token_check_fail content_type=%s, "
+		"token_check_fail buff length=%d, "
+		"load_fdfs_parameters_from_tracker=%d, "
+		"storage_sync_file_max_delay=%ds, "
+		"use_storage_id=%d, storage server id/ip count=%d / %d, "
+		"flv_support=%d, flv_extension=%s",
+		response_mode == FDFS_MOD_REPONSE_MODE_PROXY ?
+			"proxy" : "redirect",
+		g_fdfs_base_path, url_have_group_name, buff,
+		g_fdfs_connect_timeout, g_fdfs_network_timeout,
+		g_tracker_group.server_count,
+		g_if_alias_prefix, g_local_host_ip_count,
+		g_http_params.anti_steal_token,
+		g_http_params.token_ttl,
+		g_http_params.anti_steal_secret_key.length,
+		g_http_params.token_check_fail_content_type,
+		g_http_params.token_check_fail_buff.length,
+		load_fdfs_parameters_from_tracker,
+		storage_sync_file_max_delay, use_storage_id,
+		g_storage_ids_by_id.count, g_storage_ids_by_ip.count,
+        flv_support, flv_extension);
 
 	if (group_count > 0)
 	{
