@@ -348,7 +348,7 @@ int fdfs_mod_init()
 		{
 			len += snprintf(buff + len, sizeof(buff) - len, \
 				"store_path%d=%s, ", i, \
-				g_fdfs_store_paths.paths[i]);
+				g_fdfs_store_paths.paths[i].path);
 		}
 	}
 
@@ -398,7 +398,7 @@ int fdfs_mod_init()
 			{
 				len += snprintf(buff + len, sizeof(buff) - len, \
 					", store_path%d=%s", i, \
-					group_store_paths[k].store_paths.paths[i]);
+					group_store_paths[k].store_paths.paths[i].path);
 			}
 
 			logInfo("group %d. group_name=%s, " \
@@ -1085,7 +1085,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			{
 				snprintf(full_filename, \
 					sizeof(full_filename), "%s/data/%s", \
-					pStorePaths->paths[store_path_index], \
+					pStorePaths->paths[store_path_index].path, \
 					true_filename);
 				if (result == ENOENT)
 				{
@@ -1430,7 +1430,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	{
 		full_filename_len = snprintf(full_filename, \
 				sizeof(full_filename), "%s/data/%s", \
-				pStorePaths->paths[store_path_index], \
+				pStorePaths->paths[store_path_index].path, \
 				true_filename);
 		file_offset = pContext->ranges[0].start;
 	}
