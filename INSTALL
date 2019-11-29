@@ -2,27 +2,40 @@ Copy right 2010 Happy Fish / YuQing
 
 This software may be copied only under the terms of the GNU General
 Public License V3, Please visit the FastDFS Home Page for more detail.
-English language: http://english.csource.org/
-Chinese language: http://www.csource.org/
+Chinese language: http://www.fastken.com/
 
 #step 1. first install the FastDFS storage server and client library,
          the FastDFS version should >= 6.03. download with git:
-         git clone https://github.com/happyfish100/fastdfs
+         github address: https://github.com/happyfish100/fastdfs
+         gitee address:  https://gitee.com/fastdfs100/fastdfs.git
+         command lines as:
 
-#step 2. install nginx server
-         FastDFS nginx module test passed with nginx 1.15.1,
+git clone https://github.com/happyfish100/fastdfs
+cd fastdfs; git checkout V6.03
+./make.sh clean && ./make.sh && ./make.sh install
+
+#step 2. download nginx server source code from http://nginx.org/
+         FastDFS nginx module test passed with nginx 1.16.1,
          my nginx installed in /usr/local/nginx
 
-#step 3. download FastDFS nginx module source package, such as:
-cd /home/yuqing
+#step 3. download FastDFS nginx module source code,
+         github address: https://github.com/happyfish100/fastdfs-nginx-module
+         gitee address: https://gitee.com/fastdfs100/fastdfs-nginx-module.git
+         command lines as (YOUR_PATH is your base path eg. /home/yuqing ):
+
+cd $YOUR_PATH
 git clone https://github.com/happyfish100/fastdfs-nginx-module
+cd fastdfs-nginx-module; git checkout V1.22
 
 #step 4. enter the nginx source dir, compile and install fastdfs module, such as:
-cd nginx-1.15.1
-./configure --add-module=/home/yuqing/fastdfs-nginx-module/src
+
+cd nginx-1.16.1
+./configure --add-module=$YOUR_PATH/fastdfs-nginx-module/src
 make; make install
 
-Notice: before compile, you can change FDFS_OUTPUT_CHUNK_SIZE and 
+Notice:
+        * replace $YOUR_PATH with your fastdfs-nginx-module base path, such as /home/yuqing
+        * before compile, you can change FDFS_OUTPUT_CHUNK_SIZE and
         FDFS_MOD_CONF_FILENAME macro in the config file as:
 CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -DFDFS_OUTPUT_CHUNK_SIZE='256*1024' -DFDFS_MOD_CONF_FILENAME='\"/etc/fdfs/mod_fastdfs.conf\"'" 
 
