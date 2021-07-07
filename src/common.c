@@ -760,7 +760,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 #define HTTPD_MAX_PARAMS   32
 	char *file_id_without_group;
 	char *url;
-	char file_id[128];
+	char file_id[530];
 	char uri[512];
 	int url_len;
 	int uri_len;
