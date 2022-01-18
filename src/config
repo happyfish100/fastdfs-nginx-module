@@ -1,5 +1,9 @@
 ngx_addon_name=ngx_http_fastdfs_module
 
+GCC_VERSION=$(gcc -dM -E -  < /dev/null | grep -w __GNUC__ | awk '{print $NF;}')
+if [ -n "$GCC_VERSION" ] && [ $GCC_VERSION -ge 7 ]; then
+  CFLAGS="$CFLAGS -Wformat-truncation=0 -Wformat-overflow=0"
+fi
 if test -n "${ngx_module_link}"; then
     ngx_module_type=HTTP
     ngx_module_name=$ngx_addon_name
