@@ -227,18 +227,18 @@ int fdfs_mod_init()
 		}
 	}
 
-	g_fdfs_connect_timeout = iniGetIntValue(NULL, "connect_timeout", \
+	SF_G_CONNECT_TIMEOUT = iniGetIntValue(NULL, "connect_timeout", \
 			&iniContext, DEFAULT_CONNECT_TIMEOUT);
-	if (g_fdfs_connect_timeout <= 0)
+	if (SF_G_CONNECT_TIMEOUT <= 0)
 	{
-		g_fdfs_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
+		SF_G_CONNECT_TIMEOUT = DEFAULT_CONNECT_TIMEOUT;
 	}
 
-	g_fdfs_network_timeout = iniGetIntValue(NULL, "network_timeout", \
+	SF_G_NETWORK_TIMEOUT = iniGetIntValue(NULL, "network_timeout", \
 			&iniContext, DEFAULT_NETWORK_TIMEOUT);
-	if (g_fdfs_network_timeout <= 0)
+	if (SF_G_NETWORK_TIMEOUT <= 0)
 	{
-		g_fdfs_network_timeout = DEFAULT_NETWORK_TIMEOUT;
+		SF_G_NETWORK_TIMEOUT = DEFAULT_NETWORK_TIMEOUT;
 	}
 
 	load_log_level(&iniContext);
@@ -373,8 +373,8 @@ int fdfs_mod_init()
 		"flv_support=%d, flv_extension=%s",
 		response_mode == FDFS_MOD_REPONSE_MODE_PROXY ?
 			"proxy" : "redirect",
-		g_fdfs_base_path, url_have_group_name, buff,
-		g_fdfs_connect_timeout, g_fdfs_network_timeout,
+		SF_G_BASE_PATH_STR, url_have_group_name, buff,
+		SF_G_CONNECT_TIMEOUT, SF_G_NETWORK_TIMEOUT,
 		g_tracker_group.server_count,
 		g_if_alias_prefix, g_local_host_ip_count,
 		g_http_params.anti_steal_token,

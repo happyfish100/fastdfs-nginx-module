@@ -11,7 +11,7 @@ Chinese language: http://www.fastken.com/
          command lines as:
 
 git clone https://github.com/happyfish100/fastdfs
-cd fastdfs; git checkout V6.03
+cd fastdfs; git checkout V6.09
 ./make.sh clean && ./make.sh && ./make.sh install
 
 #step 2. download nginx server source code from http://nginx.org/
@@ -25,7 +25,7 @@ cd fastdfs; git checkout V6.03
 
 cd $YOUR_PATH
 git clone https://github.com/happyfish100/fastdfs-nginx-module
-cd fastdfs-nginx-module; git checkout V1.22
+cd fastdfs-nginx-module; git checkout V1.23
 
 #step 4. enter the nginx source dir, compile and install fastdfs module, such as:
 

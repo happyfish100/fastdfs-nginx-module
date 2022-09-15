@@ -8,7 +8,7 @@ if test -n "${ngx_module_link}"; then
     ngx_module_type=HTTP
     ngx_module_name=$ngx_addon_name
     ngx_module_incs="/usr/local/include"
-    ngx_module_libs="-lfastcommon -lfdfsclient"
+    ngx_module_libs="-lfastcommon -lserverframe -lfdfsclient"
     ngx_module_srcs="$ngx_addon_dir/ngx_http_fastdfs_module.c"
     ngx_module_deps=
     CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -DFDFS_OUTPUT_CHUNK_SIZE='256*1024' -DFDFS_MOD_CONF_FILENAME='\"/etc/fdfs/mod_fastdfs.conf\"'"
@@ -17,6 +17,6 @@ else
     HTTP_MODULES="$HTTP_MODULES ngx_http_fastdfs_module"
     NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_fastdfs_module.c"
     CORE_INCS="$CORE_INCS /usr/local/include"
-    CORE_LIBS="$CORE_LIBS -lfastcommon -lfdfsclient"
+    CORE_LIBS="$CORE_LIBS -lfastcommon -lserverframe -lfdfsclient"
     CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -DFDFS_OUTPUT_CHUNK_SIZE='256*1024' -DFDFS_MOD_CONF_FILENAME='\"/etc/fdfs/mod_fastdfs.conf\"'"
 fi
