@@ -1593,16 +1593,16 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 
 static int fdfs_get_params_from_tracker()
 {
-        IniContext iniContext;
+    IniContext iniContext;
 	int result;
 	bool continue_flag;
 
 	continue_flag = false;
-	if ((result=fdfs_get_ini_context_from_tracker(&g_tracker_group, \
-		&iniContext, &continue_flag, false, NULL)) != 0)
-        {
-                return result;
-        }
+	if ((result=fdfs_get_ini_context_from_tracker(&g_tracker_group,
+		&iniContext, &continue_flag)) != 0)
+    {
+        return result;
+    }
 
 	storage_sync_file_max_delay = iniGetIntValue(NULL, \
                         "storage_sync_file_max_delay", \
