@@ -5,13 +5,13 @@ Public License V3, Please visit the FastDFS Home Page for more detail.
 Chinese language: http://www.fastken.com/
 
 #step 1. first install the FastDFS storage server and client library,
-         the FastDFS version should >= 6.03. download with git:
+         the FastDFS version should >= 6.13. download with git:
          github address: https://github.com/happyfish100/fastdfs
          gitee address:  https://gitee.com/fastdfs100/fastdfs.git
          command lines as:
 
 git clone https://github.com/happyfish100/fastdfs
-cd fastdfs; git checkout V6.09
+cd fastdfs; git checkout V6.13.0
 ./make.sh clean && ./make.sh && ./make.sh install
 
 #step 2. download nginx server source code from http://nginx.org/
@@ -25,7 +25,7 @@ cd fastdfs; git checkout V6.09
 
 cd $YOUR_PATH
 git clone https://github.com/happyfish100/fastdfs-nginx-module
-cd fastdfs-nginx-module; git checkout V1.23
+cd fastdfs-nginx-module; git checkout V1.25
 
 #step 4. enter the nginx source dir, compile and install fastdfs module, such as:
 

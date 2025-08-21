@@ -108,15 +108,35 @@ static ngx_int_t fdfs_set_header(ngx_http_request_t *r, \
 	return NGX_OK;
 }
 
-static ngx_int_t fdfs_set_content_disposition(ngx_http_request_t *r, \
+static ngx_int_t fdfs_set_content_disposition(ngx_http_request_t *r,
 			struct fdfs_http_response *pResponse)
 {
+#define ATTACHMENT_PREFIX_STR  "attachment; filename=\""
+#define ATTACHMENT_PREFIX_LEN  (sizeof(ATTACHMENT_PREFIX_STR) - 1)
+
 	int value_len;
-	value_len = snprintf(pResponse->content_disposition, \
-		sizeof(pResponse->content_disposition), \
-		"attachment; filename=\"%s\"", pResponse->attachment_filename);
-	return fdfs_set_header(r, "Content-Disposition", "content-disposition",\
-		sizeof("Content-Disposition") - 1, \
+    int file_len;
+    char *p;
+
+    file_len = strlen(pResponse->attachment_filename);
+    if (file_len + ATTACHMENT_PREFIX_LEN + 2 >
+        sizeof(pResponse->content_disposition))
+    {
+        file_len = sizeof(pResponse->content_disposition) -
+            (ATTACHMENT_PREFIX_LEN + 2);
+    }
+
+    p = pResponse->content_disposition;
+    memcpy(p, ATTACHMENT_PREFIX_STR, ATTACHMENT_PREFIX_LEN);
+    p += ATTACHMENT_PREFIX_LEN;
+    memcpy(p, pResponse->attachment_filename, file_len);
+    p += file_len;
+    *p++ = '"';
+    *p = '\0';
+    value_len = p - pResponse->content_disposition;
+	return fdfs_set_header(r, "Content-Disposition",
+        "content-disposition",
+		sizeof("Content-Disposition") - 1,
 		pResponse->content_disposition, value_len);
 }
 

@@ -1,3 +1,6 @@
+Version 1.25  2025-08-21
+ * performance opt.: replace sprintf and snprintf as necessary
+ * you must upgrade your FastDFS to v6.13 or higher version
 
 Version 1.24  2023-12-05
  * you must upgrade your FastDFS to v6.11 or higher version

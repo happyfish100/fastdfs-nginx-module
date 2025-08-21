@@ -94,7 +94,7 @@ struct fdfs_http_response {
 	char *content_type;
 	char *attachment_filename;
 	char redirect_url[256];
-	char content_disposition[128];
+	char content_disposition[256];
 	char content_type_buff[128];
 	char range[256];  //for redirect
 	char range_content_type[64];  //for multi range content

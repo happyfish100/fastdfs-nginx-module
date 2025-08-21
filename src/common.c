@@ -82,6 +82,9 @@ static int fdfs_strtoll(const char *s, int64_t *value)
 
 static int fdfs_load_groups_store_paths(IniContext *pItemContext)
 {
+#define FDFS_GROUP_PREFIX_STR  "group"
+#define FDFS_GROUP_PREFIX_LEN  (sizeof(FDFS_GROUP_PREFIX_STR) - 1)
+
 	char section_name[64];
 	char *pGroupName;
 	int bytes;
@@ -99,11 +102,12 @@ static int fdfs_load_groups_store_paths(IniContext *pItemContext)
 		return errno != 0 ? errno : ENOMEM;
 	}
 
+    memcpy(section_name, FDFS_GROUP_PREFIX_STR, FDFS_GROUP_PREFIX_LEN);
 	for (i=0; i<group_count; i++)
 	{
-		sprintf(section_name, "group%d", i + 1);
-		pGroupName = iniGetStrValue(section_name, "group_name", \
-				pItemContext);
+        fc_ltostr(i + 1, section_name + FDFS_GROUP_PREFIX_LEN);
+		pGroupName = iniGetStrValue(section_name,
+                "group_name", pItemContext);
 		if (pGroupName == NULL)
 		{
 			logError("file: "__FILE__", line: %d, " \
@@ -116,10 +120,8 @@ static int fdfs_load_groups_store_paths(IniContext *pItemContext)
 			section_name, "storage_server_port", pItemContext, \
 			FDFS_STORAGE_SERVER_DEF_PORT);
 
-		group_store_paths[i].group_name_len = snprintf( \
-			group_store_paths[i].group_name, \
-			sizeof(group_store_paths[i].group_name), \
-			"%s", pGroupName);
+		group_store_paths[i].group_name_len = fc_safe_strcpy(
+                group_store_paths[i].group_name, pGroupName);
 		if (group_store_paths[i].group_name_len == 0)
 		{
 			logError("file: "__FILE__", line: %d, " \
@@ -209,8 +211,7 @@ int fdfs_mod_init()
 			break;
 		}
 
-		my_group_name_len = snprintf(my_group_name, \
-				sizeof(my_group_name), "%s", pGroupName);
+		my_group_name_len = fc_safe_strcpy(my_group_name, pGroupName);
 		if (my_group_name_len == 0)
 		{
 			logError("file: "__FILE__", line: %d, " \
@@ -221,7 +222,8 @@ int fdfs_mod_init()
 			break;
 		}
 
-		if ((result=storage_load_paths_from_conf_file(&iniContext)) != 0)
+		if ((result=storage_load_paths_from_conf_file(&iniContext,
+                        FDFS_MOD_CONF_FILENAME)) != 0)
 		{
 			break;
 		}
@@ -277,8 +279,7 @@ int fdfs_mod_init()
 	}
 	else
 	{
-		snprintf(g_if_alias_prefix, sizeof(g_if_alias_prefix),
-			"%s", pIfAliasPrefix);
+		fc_safe_strcpy(g_if_alias_prefix, pIfAliasPrefix);
 	}
 
 	load_fdfs_parameters_from_tracker = iniGetBoolValue(NULL, \
@@ -314,12 +315,12 @@ int fdfs_mod_init()
 					&iniContext);
 		if (flvExtension == NULL)
 		{
-			flv_ext_len = sprintf(flv_extension, "flv");
+			strcpy(flv_extension, "flv");
+            flv_ext_len = 3;
 		}
 		else
 		{
-			flv_ext_len = snprintf(flv_extension, \
-				sizeof(flv_extension), "%s", flvExtension);
+			flv_ext_len = fc_safe_strcpy(flv_extension, flvExtension);
 		}
 	}
 
@@ -348,7 +349,7 @@ int fdfs_mod_init()
 		{
 			len += snprintf(buff + len, sizeof(buff) - len, \
 				"store_path%d=%s, ", i, \
-				g_fdfs_store_paths.paths[i].path);
+				g_fdfs_store_paths.paths[i].path.str);
 		}
 	}
 
@@ -398,7 +399,7 @@ int fdfs_mod_init()
 			{
 				len += snprintf(buff + len, sizeof(buff) - len, \
 					", store_path%d=%s", i, \
-					group_store_paths[k].store_paths.paths[i].path);
+					group_store_paths[k].store_paths.paths[i].path.str);
 			}
 
 			logInfo("group %d. group_name=%s, " \
@@ -452,12 +453,28 @@ static int fdfs_send_range_subheader(struct fdfs_http_context *pContext,
         struct fdfs_http_response *pResponse, const int index)
 {
     char buff[256];
-    int len;
+    char *p;
+    int content_type_len;
 
-    len = snprintf(buff, sizeof(buff), "%s%s\r\n%s%s\r\n\r\n",
-            FDFS_CONTENT_TYPE_TAG_STR, pResponse->range_content_type,
-            FDFS_CONTENT_RANGE_TAG_STR, pResponse->content_ranges[index].content);
-    return pContext->send_reply_chunk(pContext->arg, false, buff, len);
+    content_type_len = strlen(pResponse->range_content_type);
+    p = buff;
+    memcpy(p, FDFS_CONTENT_TYPE_TAG_STR, FDFS_CONTENT_TYPE_TAG_LEN);
+    p += FDFS_CONTENT_TYPE_TAG_LEN;
+    memcpy(p, pResponse->range_content_type, content_type_len);
+    p += content_type_len;
+    *p++ = '\r';
+    *p++ = '\n';
+    memcpy(p, FDFS_CONTENT_RANGE_TAG_STR, FDFS_CONTENT_RANGE_TAG_LEN);
+    p += FDFS_CONTENT_RANGE_TAG_LEN;
+    memcpy(p, pResponse->content_ranges[index].content,
+            pResponse->content_ranges[index].length);
+    p += pResponse->content_ranges[index].length;
+    *p++ = '\r';
+    *p++ = '\n';
+    *p++ = '\r';
+    *p++ = '\n';
+    *p = '\0';
+    return pContext->send_reply_chunk(pContext->arg, false, buff, p - buff);
 }
 
 static int fdfs_download_callback(void *arg, const int64_t file_size, \
@@ -516,27 +533,35 @@ static void fdfs_do_format_range(const struct fdfs_http_range *range,
 {
 	if (range->start < 0)
 	{
-		pResponse->range_len += sprintf(pResponse->range + pResponse->range_len, \
-			"%"PRId64, range->start);
+		pResponse->range_len += fc_itoa(range->start,
+                pResponse->range + pResponse->range_len);
 	}
 	else if (range->end == 0)
 	{
-		pResponse->range_len += sprintf(pResponse->range + pResponse->range_len, \
-			"%"PRId64"-", range->start);
+		pResponse->range_len += fc_itoa(range->start,
+                pResponse->range + pResponse->range_len);
+        *(pResponse->range + pResponse->range_len++) = '-';
 	}
 	else
-	{
-		pResponse->range_len += sprintf(pResponse->range + pResponse->range_len, \
-			"%"PRId64"-%"PRId64, \
-			range->start, range->end);
-	}
+    {
+        pResponse->range_len += fc_itoa(range->start,
+                pResponse->range + pResponse->range_len);
+        *(pResponse->range + pResponse->range_len++) = '-';
+        pResponse->range_len += fc_itoa(range->end,
+                pResponse->range + pResponse->range_len);
+    }
 }
 
 static void fdfs_format_range(struct fdfs_http_context *pContext,
 	struct fdfs_http_response *pResponse)
 {
+#define RANGE_BYTES_TAG_STR  "bytes="
+#define RANGE_BYTES_TAG_LEN  (sizeof(RANGE_BYTES_TAG_STR) - 1)
+
     int i;
-    pResponse->range_len = sprintf(pResponse->range, "%s", "bytes=");
+
+    memcpy(pResponse->range, RANGE_BYTES_TAG_STR, RANGE_BYTES_TAG_LEN);
+    pResponse->range_len = RANGE_BYTES_TAG_LEN;
     for (i=0; i<pContext->range_count; i++)
     {
         if (i > 0)
@@ -546,14 +571,27 @@ static void fdfs_format_range(struct fdfs_http_context *pContext,
         }
         fdfs_do_format_range(pContext->ranges + i, pResponse);
     }
+    *(pResponse->range + pResponse->range_len) = '\0';
 }
 
 static void fdfs_do_format_content_range(const struct fdfs_http_range *range,
 	const int64_t file_size, struct fdfs_http_resp_content_range *content_range)
 {
-	content_range->length = sprintf(content_range->content,
-		"bytes %"PRId64"-%"PRId64"/%"PRId64,
-        range->start, range->end, file_size);
+#define RANGE_BYTES_MARK_STR  "bytes "
+#define RANGE_BYTES_MARK_LEN  (sizeof(RANGE_BYTES_MARK_STR) - 1)
+    char *p;
+
+    p = content_range->content;
+    memcpy(p, RANGE_BYTES_MARK_STR, RANGE_BYTES_MARK_LEN);
+    p += RANGE_BYTES_MARK_LEN;
+    p += fc_itoa(range->start, p);
+    *p++ = '-';
+    p += fc_itoa(range->end, p);
+    *p++ = '/';
+    p += fc_itoa(file_size, p);
+    *p = '\0';
+
+	content_range->length = p - content_range->content;
 }
 
 static void fdfs_format_content_range(struct fdfs_http_context *pContext,
@@ -586,6 +624,9 @@ static int fdfs_calc_content_length(struct fdfs_http_context *pContext,
         const char *ext_name, const int ext_len,
         struct fdfs_http_response *pResponse)
 {
+#define MULTIPART_BYTERANGES_STR "multipart/byteranges; boundary="
+#define MULTIPART_BYTERANGES_LEN (sizeof(MULTIPART_BYTERANGES_STR) - 1)
+
     int result;
     int i;
     int content_type_part_len;
@@ -594,11 +635,14 @@ static int fdfs_calc_content_length(struct fdfs_http_context *pContext,
     pResponse->content_length = download_bytes + flv_header_len;
     if (pContext->if_range && pContext->range_count > 1)
     {
-       pResponse->boundary_len = sprintf(pResponse->boundary,
-               "%"PRIx64, get_current_time_us());
-       sprintf(pResponse->content_type_buff,
-               "multipart/byteranges; boundary=%s",
+       pResponse->boundary_len = fc_ltostr(get_current_time_us(),
                pResponse->boundary);
+       memcpy(pResponse->content_type_buff, MULTIPART_BYTERANGES_STR,
+               MULTIPART_BYTERANGES_LEN);
+       memcpy(pResponse->content_type_buff + MULTIPART_BYTERANGES_LEN,
+               pResponse->boundary, pResponse->boundary_len);
+       *(pResponse->content_type_buff  + MULTIPART_BYTERANGES_LEN +
+               pResponse->boundary_len) = '\0';
        pResponse->content_type = pResponse->content_type_buff;
 
        if ((result=fdfs_http_get_content_type_by_extname(&g_http_params,
@@ -854,7 +898,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	{
 		int group_name_len;
 
-		snprintf(file_id, sizeof(file_id), "%s", uri + 1);
+		fc_safe_strcpy(file_id, uri + 1);
 		file_id_without_group = strchr(file_id, '/');
 		if (file_id_without_group == NULL)
 		{
@@ -900,8 +944,8 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		pStorePaths = &g_fdfs_store_paths;
 		bSameGroup = true;
 		file_id_without_group = uri + 1; //skip /
-		snprintf(file_id, sizeof(file_id), "%s/%s", \
-			my_group_name, file_id_without_group);
+        fc_combine_two_strings(my_group_name,
+                file_id_without_group, '/', file_id);
 	}
 
 	if (strlen(file_id_without_group) < 22)
@@ -1083,11 +1127,12 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			}
 			else
 			{
-				snprintf(full_filename, \
-					sizeof(full_filename), "%s/data/%s", \
-					pStorePaths->paths[store_path_index].path, \
-					true_filename);
-				if (result == ENOENT)
+                fc_get_one_subdir_full_filename(
+                        pStorePaths->paths[store_path_index].path.str,
+                        pStorePaths->paths[store_path_index].path.len,
+                        "data", 4, true_filename, filename_len,
+                        full_filename);
+                if (result == ENOENT)
 				{
 					logError("file: "__FILE__", line: %d, "\
 						"file: %s not exist", \
@@ -1142,7 +1187,8 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			}
 			else
 			{
-				sprintf(port_part, ":%d", pContext->server_port);
+                *port_part = ':';
+                fc_ltostr(pContext->server_port, port_part + 1);
 			}
 
 			if (param_count == 0)
@@ -1189,7 +1235,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		}
 	}
 
-	ext_name = fdfs_http_get_file_extension(true_filename, \
+	ext_name = fdfs_http_get_file_extension(true_filename,
 			filename_len, &ext_len);
 	/*
 	if (g_http_params.need_find_content_type)
@@ -1428,10 +1474,11 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	}
 	else
 	{
-		full_filename_len = snprintf(full_filename, \
-				sizeof(full_filename), "%s/data/%s", \
-				pStorePaths->paths[store_path_index].path, \
-				true_filename);
+        full_filename_len = fc_get_one_subdir_full_filename(
+                pStorePaths->paths[store_path_index].path.str,
+                pStorePaths->paths[store_path_index].path.len,
+                "data", 4, true_filename, filename_len,
+                full_filename);
 		file_offset = pContext->ranges[0].start;
 	}
 
