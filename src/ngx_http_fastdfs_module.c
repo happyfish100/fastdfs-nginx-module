@@ -795,7 +795,6 @@ static int ngx_http_fastdfs_proxy_handler(void *arg, \
 			const char *dest_ip_addr)
 {
 	ngx_http_request_t *r;
-	ngx_int_t rc;
 	ngx_http_upstream_t *u;
 	ngx_http_fastdfs_proxy_ctx_t *ctx;
 	ngx_http_fastdfs_loc_conf_t *plcf;
