@@ -481,22 +481,22 @@ static ngx_int_t ngx_http_fastdfs_proxy_create_request(ngx_http_request_t *r)
 	header = part->elts;
 
 	for (i = 0; /* void */; i++)
-	{
-		if (i >= part->nelts)
-		{
-			if (part->next == NULL)
-			{
-				break;
-			}
+    {
+        if (i >= part->nelts)
+        {
+            if (part->next == NULL)
+            {
+                break;
+            }
 
-			part = part->next;
-			header = part->elts;
-			i = 0;
-		}
-
-		len += header[i].key.len + 2 + header[i].value.len + 
-			sizeof(CRLF) - 1;
+            part = part->next;
+            header = part->elts;
+            i = 0;
         }
+
+        len += header[i].key.len + 2 + header[i].value.len +
+            sizeof(CRLF) - 1;
+    }
 
 	b = ngx_create_temp_buf(r->pool, len);
 	if (b == NULL)
@@ -530,7 +530,7 @@ static ngx_int_t ngx_http_fastdfs_proxy_create_request(ngx_http_request_t *r)
 	b->last = ngx_cpymem(b->last, FDFS_REDIRECT_PARAM,
 			sizeof(FDFS_REDIRECT_PARAM) - 1);
 
-	u->uri.len =  b->last - u->uri.data;
+	u->uri.len = b->last - u->uri.data;
 
 	*b->last++ = ' ';
 	b->last = ngx_cpymem(b->last, ngx_http_fastdfs_proxy_version,
@@ -590,7 +590,6 @@ static ngx_int_t ngx_http_fastdfs_proxy_reinit_request(ngx_http_request_t *r)
     ctx->status.end = NULL;
 
     r->upstream->process_header = ngx_http_fastdfs_proxy_process_status_line;
-    r->state = 0;
 
     return NGX_OK;
 }
@@ -834,7 +833,7 @@ static int ngx_http_fastdfs_proxy_handler(void *arg, \
 	strcpy(ctx->dest_ip_addr, dest_ip_addr);
 	u->resolved->host.data = (u_char *)ctx->dest_ip_addr;
 	u->resolved->host.len = strlen(ctx->dest_ip_addr);
-	u->resolved->port = (in_port_t)ntohs(((struct sockaddr_in *)r-> \
+	u->resolved->port = (in_port_t)ntohs(((struct sockaddr_in *)r->
 				connection->local_sockaddr)->sin_port);
 
 	u->output.tag = (ngx_buf_tag_t) &ngx_http_fastdfs_module;
@@ -844,27 +843,10 @@ static int ngx_http_fastdfs_proxy_handler(void *arg, \
 	u->process_header = ngx_http_fastdfs_proxy_process_status_line;
 	u->abort_request = ngx_http_fastdfs_proxy_abort_request;
 	u->finalize_request = ngx_http_fastdfs_proxy_finalize_request;
-	r->state = 0;
 
-	/*
-	u->pipe = ngx_pcalloc(r->pool, sizeof(ngx_event_pipe_t));
-	if (u->pipe == NULL)
-	{
-		return NGX_HTTP_INTERNAL_SERVER_ERROR;
-	}
-
-	u->pipe->input_filter = ngx_event_pipe_copy_input_filter;
-	u->accel = 1;
-	*/
-
-	rc = ngx_http_read_client_request_body(r, ngx_http_upstream_init);
-
-	if (rc >= NGX_HTTP_SPECIAL_RESPONSE)
-	{
-		return rc;
-	}
-
-	return NGX_DONE;
+    r->main->count++;
+    ngx_http_upstream_init(r);
+    return NGX_DONE;
 }
 
 static ngx_int_t ngx_http_fastdfs_handler(ngx_http_request_t *r)

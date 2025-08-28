@@ -353,7 +353,7 @@ int fdfs_mod_init()
 		}
 	}
 
-	logInfo("fastdfs apache / nginx module v1.21, "
+	logInfo("fastdfs apache / nginx module v1.25, "
 		"response_mode=%s, "
 		"base_path=%s, "
 		"url_have_group_name=%d, "
@@ -1152,7 +1152,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 			return HTTP_NOTFOUND;
 		}
 
-		redirect = fdfs_http_get_parameter("redirect", \
+		redirect = fdfs_http_get_parameter("redirect",
 						params, param_count);
 		if (redirect != NULL)
 		{
@@ -1230,7 +1230,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		}
 		else if (pContext->proxy_handler != NULL)
 		{
-			return pContext->proxy_handler(pContext->arg, \
+			return pContext->proxy_handler(pContext->arg,
 					file_info.source_ip_addr);
 		}
 	}
