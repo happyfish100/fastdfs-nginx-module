@@ -791,7 +791,7 @@ static ngx_int_t ngx_http_fastdfs_proxy_process_header(ngx_http_request_t *r)
     }
 }
 
-static int ngx_http_fastdfs_proxy_handler(void *arg, \
+static int ngx_http_fastdfs_proxy_handler(void *arg,
 			const char *dest_ip_addr)
 {
 	ngx_http_request_t *r;
@@ -830,6 +830,21 @@ static int ngx_http_fastdfs_proxy_handler(void *arg, \
 
 	ngx_str_set(&u->schema, "http://");
 	strcpy(ctx->dest_ip_addr, dest_ip_addr);
+
+    struct sockaddr_in *sa = ngx_pcalloc(r->pool,
+            sizeof(struct sockaddr_in));
+    if (sa == NULL)
+    {
+		return NGX_ERROR;
+    }
+    sa->sin_family = AF_INET;
+    sa->sin_port = ((struct sockaddr_in *)r->connection->
+            local_sockaddr)->sin_port;
+    sa->sin_addr.s_addr = inet_addr(dest_ip_addr);
+    u->resolved->sockaddr = (struct sockaddr *)sa;
+    u->resolved->socklen = sizeof(struct sockaddr_in);
+    u->resolved->naddrs = 1;
+
 	u->resolved->host.data = (u_char *)ctx->dest_ip_addr;
 	u->resolved->host.len = strlen(ctx->dest_ip_addr);
 	u->resolved->port = (in_port_t)ntohs(((struct sockaddr_in *)r->
