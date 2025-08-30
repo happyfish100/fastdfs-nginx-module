@@ -798,6 +798,7 @@ static int ngx_http_fastdfs_proxy_handler(void *arg,
 	ngx_http_upstream_t *u;
 	ngx_http_fastdfs_proxy_ctx_t *ctx;
 	ngx_http_fastdfs_loc_conf_t *plcf;
+    int network_port;
 
 	r = (ngx_http_request_t *)arg;
 
@@ -831,24 +832,57 @@ static int ngx_http_fastdfs_proxy_handler(void *arg,
 	ngx_str_set(&u->schema, "http://");
 	strcpy(ctx->dest_ip_addr, dest_ip_addr);
 
-    struct sockaddr_in *sa = ngx_pcalloc(r->pool,
-            sizeof(struct sockaddr_in));
-    if (sa == NULL)
+    if (r->connection->local_socklen == sizeof(struct sockaddr_in))
     {
-		return NGX_ERROR;
+        network_port = ((struct sockaddr_in *)r->
+                connection->local_sockaddr)->sin_port;
     }
-    sa->sin_family = AF_INET;
-    sa->sin_port = ((struct sockaddr_in *)r->connection->
-            local_sockaddr)->sin_port;
-    sa->sin_addr.s_addr = inet_addr(dest_ip_addr);
-    u->resolved->sockaddr = (struct sockaddr *)sa;
-    u->resolved->socklen = sizeof(struct sockaddr_in);
-    u->resolved->naddrs = 1;
+    else
+    {
+        network_port = ((struct sockaddr_in6 *)r->
+                connection->local_sockaddr)->sin6_port;
+    }
+
+    if (is_ipv6_addr(dest_ip_addr))
+    {
+        struct sockaddr_in6 *addr6 = ngx_pcalloc(r->pool,
+                sizeof(struct sockaddr_in6));
+        if (addr6 == NULL)
+        {
+            return NGX_ERROR;
+        }
+        addr6->sin6_family = AF_INET6;
+        addr6->sin6_port = network_port;
+        if (inet_pton(AF_INET6, dest_ip_addr, &addr6->sin6_addr) == 0)
+        {
+            logError("file: "__FILE__", line: %d, "
+                    "invalid IPv6 ip address: %s", __LINE__,
+                    dest_ip_addr);
+            return NGX_ERROR;
+        }
+        u->resolved->sockaddr = (struct sockaddr *)addr6;
+        u->resolved->socklen = sizeof(struct sockaddr_in6);
+        u->resolved->naddrs = 1;
+    }
+    else
+    {
+        struct sockaddr_in *addr4 = ngx_pcalloc(r->pool,
+                sizeof(struct sockaddr_in));
+        if (addr4 == NULL)
+        {
+            return NGX_ERROR;
+        }
+        addr4->sin_family = AF_INET;
+        addr4->sin_port = network_port;
+        addr4->sin_addr.s_addr = inet_addr(dest_ip_addr);
+        u->resolved->sockaddr = (struct sockaddr *)addr4;
+        u->resolved->socklen = sizeof(struct sockaddr_in);
+        u->resolved->naddrs = 1;
+    }
 
 	u->resolved->host.data = (u_char *)ctx->dest_ip_addr;
 	u->resolved->host.len = strlen(ctx->dest_ip_addr);
-	u->resolved->port = (in_port_t)ntohs(((struct sockaddr_in *)r->
-				connection->local_sockaddr)->sin_port);
+    u->resolved->port = (in_port_t)ntohs(network_port);
 
 	u->output.tag = (ngx_buf_tag_t) &ngx_http_fastdfs_module;
 
