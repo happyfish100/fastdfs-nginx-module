@@ -254,7 +254,7 @@ static void fdfs_output_headers(void *arg, struct fdfs_http_response *pResponse)
 	}
 }
 
-static int fdfs_send_reply_chunk(void *arg, const bool last_buf, \
+static int fdfs_send_reply_chunk(void *arg, const bool last_buf,
 		const char *buff, const int size)
 {
 	ngx_http_request_t *r;
@@ -292,26 +292,24 @@ static int fdfs_send_reply_chunk(void *arg, const bool last_buf, \
 	b->last_in_chain = last_buf;
 	b->last_buf = last_buf;
 
-	/*
-	ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, 
-			"ngx_http_output_filter, sent: %d", r->connection->sent);
-	*/
-
 	rc = ngx_http_output_filter(r, &out);
 	if (rc == NGX_OK || rc == NGX_AGAIN)
 	{
 		return 0;
 	}
 	else
-	{
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, 
-			"ngx_http_output_filter fail, return code: %d", rc);
-		return rc;
-	}
+    {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "file: "__FILE__", line: %d, ngx_http_output_filter fail, "
+                "return code: %d, buff size: %d, last_buf: %d, "
+                "header sent: %d, sent bytes: %d", __LINE__, rc,
+                size, last_buf, r->header_sent, r->connection->sent);
+        return rc;
+    }
 }
 
-static int fdfs_send_file(void *arg, const char *filename, \
-	const int filename_len, const int64_t file_offset, \
+static int fdfs_send_file(void *arg, const char *filename,
+	const int filename_len, const int64_t file_offset,
 	const int64_t download_bytes)
 {
 	ngx_http_request_t *r;
@@ -340,7 +338,7 @@ static int fdfs_send_file(void *arg, const char *filename, \
 	of.min_uses = ccf->open_file_cache_min_uses;
 	of.errors = ccf->open_file_cache_errors;
 	of.events = ccf->open_file_cache_events;
-	if (ngx_open_cached_file(ccf->open_file_cache, &ngx_filename, \
+	if (ngx_open_cached_file(ccf->open_file_cache, &ngx_filename,
 			&of, r->pool) != NGX_OK)
 	{
 		switch (of.err)
@@ -396,7 +394,7 @@ static int fdfs_send_file(void *arg, const char *filename, \
 	out.buf = b;
 	out.next = NULL;
 
-        b->file_pos = file_offset;
+    b->file_pos = file_offset;
 	b->file_last = file_offset + download_bytes;
 	b->in_file = download_bytes > 0 ? 1 : 0;
 	b->file->fd = of.fd;
@@ -414,11 +412,15 @@ static int fdfs_send_file(void *arg, const char *filename, \
 		return NGX_HTTP_OK;
 	}
 	else
-	{
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, 
-			"ngx_http_output_filter fail, return code: %d", rc);
-		return NGX_HTTP_INTERNAL_SERVER_ERROR;
-	}
+    {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "file: "__FILE__", line: %d, ngx_http_output_filter fail, "
+                "return code: %d, file offset: %"PRId64", download bytes: "
+                "%"PRId64", header sent: %d, sent bytes: %d", __LINE__,
+                rc, file_offset, download_bytes, r->header_sent,
+                r->connection->sent);
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
 }
 
 static ngx_int_t ngx_http_fastdfs_proxy_create_request(ngx_http_request_t *r)
@@ -940,7 +942,7 @@ static ngx_int_t ngx_http_fastdfs_handler(ngx_http_request_t *r)
 	context.send_file = fdfs_send_file;
 	context.send_reply_chunk = fdfs_send_reply_chunk;
 	context.proxy_handler = ngx_http_fastdfs_proxy_handler;
-	context.server_port = ntohs(((struct sockaddr_in *)r->connection-> \
+	context.server_port = ntohs(((struct sockaddr_in *)r->connection->
 					local_sockaddr)->sin_port);
 
 	if (r->headers_in.if_modified_since != NULL)
