@@ -1039,7 +1039,8 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		return HTTP_BADREQUEST;
 	}
 
-	if ((result=fdfs_get_file_info_ex1(file_id, false, &file_info)) != 0)
+	if ((result=fdfs_get_file_info_ex1(file_id, false, &file_info,
+                    FDFS_QUERY_FINFO_FLAGS_NOT_CALC_CRC32)) != 0)
 	{
 		if (result == ENOENT)
 		{
@@ -1265,8 +1266,8 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				(pContext->if_range && file_info.file_size < 0);
 		if (if_get_file_info)
 		{
-			if ((result=fdfs_get_file_info_ex1(file_id, true, \
-				&file_info)) != 0)
+			if ((result=fdfs_get_file_info_ex1(file_id, true, &file_info,
+                            FDFS_QUERY_FINFO_FLAGS_NOT_CALC_CRC32)) != 0)
 			{
 				if (result == ENOENT)
 				{

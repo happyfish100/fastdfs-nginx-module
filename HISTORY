@@ -1,3 +1,7 @@
+
+Version 1.26  2025-11-12
+ * you must upgrade your FastDFS to v6.15.1 or higher version
+
 Version 1.25  2025-08-31
  * performance opt.: replace sprintf and snprintf as necessary
  * call ngx_http_upstream_init directly
