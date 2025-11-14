@@ -141,10 +141,11 @@ int fdfs_mod_init();
 /**
 * http request handler
 * params:
+* 	r the nginx http request
 *	pContext the context
 * return: http status code, HTTP_OK success, != HTTP_OK fail
 */
-int fdfs_http_request_handler(struct fdfs_http_context *pContext);
+int fdfs_http_request_handler(ngx_http_request_t *r, struct fdfs_http_context *pContext);
 
 /**
 * format http datetime

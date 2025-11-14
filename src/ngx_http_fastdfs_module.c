@@ -1001,7 +1001,7 @@ static ngx_int_t ngx_http_fastdfs_handler(ngx_http_request_t *r)
 			r->uri.len, r->uri.data);
 	*/
 
-	return fdfs_http_request_handler(&context);
+	return fdfs_http_request_handler(r, &context);
 }
 
 static char *ngx_http_fastdfs_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
