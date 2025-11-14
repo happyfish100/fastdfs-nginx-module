@@ -982,37 +982,39 @@ int fdfs_http_request_handler(ngx_http_request_t *r, struct fdfs_http_context *p
 		int timestamp;
 
 		ngx_table_elt_t *header_found = NULL;
+		if (pass_header != NULL && pass_header_value != NULL && strlen(pass_header) > 0 && strlen(pass_header_value) > 0)
+		{
+			ngx_list_part_t *part = &r->headers_in.headers.part;
+        		ngx_table_elt_t *header = part->elts;
 
-		ngx_list_part_t *part = &r->headers_in.headers.part;
-        ngx_table_elt_t *header = part->elts;
+		        ngx_uint_t i;
+		        for (i = 0; /* void */; i++)
+		        {
+		            if (i >= part->nelts)
+		            {
+		                if (part->next == NULL)
+		                {
+		                    break;
+                		}
 
-        ngx_uint_t i;
-        for (i = 0; /* void */; i++)
-        {
-            if (i >= part->nelts)
-            {
-                if (part->next == NULL)
-                {
-                    break;
-                }
+		                part = part->next;
+		                header = part->elts;
+		                i = 0;
+		            }
 
-                part = part->next;
-                header = part->elts;
-                i = 0;
-            }
-
-            if (ngx_strncasecmp(header[i].key.data, (u_char *)pass_header, header[i].key.len) == 0)
-            {
-                if (ngx_strcasecmp(header[i].value.data, (u_char *)pass_header_value) == 0) {
+            		    if (ngx_strncasecmp(header[i].key.data, (u_char *)pass_header, header[i].key.len) == 0)
+		            {
+                		if (ngx_strcasecmp(header[i].value.data, (u_char *)pass_header_value) == 0) {
 					logDebug("file: " __FILE__ ", line: %d, " \
 							"Found pass header: %s=%s, uri: %s", \
 							__LINE__, pass_header, pass_header_value, uri);
-                    header_found = header;
-                } else {
-                    header_found = NULL;
-                }
-            }
-        }
+		                        header_found = header;
+		                } else {
+                		        header_found = NULL;
+		                }
+            		    }
+			}
+        	}
 
 		if (header_found != NULL)
 		{
