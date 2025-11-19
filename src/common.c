@@ -64,6 +64,8 @@ static char response_mode = FDFS_MOD_REPONSE_MODE_PROXY;
 static GroupStorePaths *group_store_paths = NULL;   //for multi groups
 static FDFSHTTPParams g_http_params;
 static int storage_sync_file_max_delay = 24 * 3600;
+static char pass_header[256];
+static char pass_header_value[256];
 
 static int fdfs_get_params_from_tracker();
 static int fdfs_format_http_datetime(time_t t, char *buff, const int buff_size);
@@ -102,12 +104,11 @@ static int fdfs_load_groups_store_paths(IniContext *pItemContext)
 		return errno != 0 ? errno : ENOMEM;
 	}
 
-    memcpy(section_name, FDFS_GROUP_PREFIX_STR, FDFS_GROUP_PREFIX_LEN);
+        memcpy(section_name, FDFS_GROUP_PREFIX_STR, FDFS_GROUP_PREFIX_LEN);
 	for (i=0; i<group_count; i++)
 	{
-        fc_ltostr(i + 1, section_name + FDFS_GROUP_PREFIX_LEN);
-		pGroupName = iniGetStrValue(section_name,
-                "group_name", pItemContext);
+		fc_ltostr(i + 1, section_name + FDFS_GROUP_PREFIX_LEN);
+		pGroupName = iniGetStrValue(section_name, "group_name", pItemContext);
 		if (pGroupName == NULL)
 		{
 			logError("file: "__FILE__", line: %d, " \
@@ -121,7 +122,7 @@ static int fdfs_load_groups_store_paths(IniContext *pItemContext)
 			FDFS_STORAGE_SERVER_DEF_PORT);
 
 		group_store_paths[i].group_name_len = fc_safe_strcpy(
-                group_store_paths[i].group_name, pGroupName);
+			group_store_paths[i].group_name, pGroupName);
 		if (group_store_paths[i].group_name_len == 0)
 		{
 			logError("file: "__FILE__", line: %d, " \
@@ -129,7 +130,7 @@ static int fdfs_load_groups_store_paths(IniContext *pItemContext)
 				"can't be empty!", __LINE__, section_name);
 			return EINVAL;
 		}
-		
+
 		group_store_paths[i].store_paths.paths = \
 			storage_load_paths_from_conf_file_ex(pItemContext, \
 			section_name, false, &group_store_paths[i].store_paths.count, \
@@ -324,6 +325,21 @@ int fdfs_mod_init()
 		}
 	}
 
+	char *passHeader;
+	passHeader = iniGetStrValue(NULL, "anti_steal_pass_header", \
+					&iniContext);
+	if (passHeader != NULL)
+	{
+		fc_safe_strcpy(pass_header, passHeader);
+
+		char *passHeaderValue;
+		passHeaderValue = iniGetStrValue(NULL, "anti_steal_pass_header_value", \
+					&iniContext);
+		if (passHeaderValue != NULL){
+			fc_safe_strcpy(pass_header_value, passHeaderValue);
+		}
+	}
+
 	iniFreeContext(&iniContext);
 	if (result != 0)
 	{
@@ -353,7 +369,7 @@ int fdfs_mod_init()
 		}
 	}
 
-	logInfo("fastdfs apache / nginx module v1.25, "
+	logInfo("fastdfs apache / nginx module v1.26, "
 		"response_mode=%s, "
 		"base_path=%s, "
 		"url_have_group_name=%d, "
@@ -799,7 +815,7 @@ static int fdfs_send_file_buffer(struct fdfs_http_context *pContext,
     return 0;
 }
 
-int fdfs_http_request_handler(struct fdfs_http_context *pContext)
+int fdfs_http_request_handler(const fdfs_http_headers_t *req_headers, struct fdfs_http_context *pContext)
 {
 #define HTTPD_MAX_PARAMS   32
 	char *file_id_without_group;
@@ -830,7 +846,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	int result;
 	int http_status;
 	int the_storage_port;
-    int i;
+	int i;
 	struct fdfs_http_response response;
 	FDFSFileInfo file_info;
 	bool bFileExists;
@@ -964,45 +980,76 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		char *ts;
 		int timestamp;
 
-		token = fdfs_http_get_parameter("token", params, param_count);
-		ts = fdfs_http_get_parameter("ts", params, param_count);
-		if (token == NULL || ts == NULL)
+		fdfs_http_header_t *header_found = NULL;
+		if (pass_header != NULL && pass_header_value != NULL && strlen(pass_header) > 0 && strlen(pass_header_value) > 0)
 		{
-			logError("file: "__FILE__", line: %d, " \
-				"expect parameter token or ts in url, " \
-				"uri: %s", __LINE__, uri);
-			OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
-			return HTTP_BADREQUEST;
+		 	for (size_t i = 0; i < req_headers->count; i++) {
+        		if (strcasecmp(req_headers->headers[i].key, pass_header) == 0) {
+					if (strcasecmp(req_headers->headers[i].value, pass_header_value) == 0) {
+						logDebug("file: " __FILE__ ", line: %d, " \
+							"Found pass header: %s=%s, uri: %s", \
+							__LINE__, req_headers->headers[i].key, req_headers->headers[i].value, uri);
+						header_found = (fdfs_http_header_t *)&req_headers->headers[i];
+						break;
+					} else {
+						header_found = NULL;
+					}
+        		}
+    		}
 		}
 
-		timestamp = atoi(ts);
-		if ((result=fdfs_http_check_token( \
+	
+
+		if (header_found != NULL)
+		{
+			logDebug("file: " __FILE__ \
+					 ", line: %d, " \
+					 "Skip check bcz found pass_header, uri: %s", \
+					 __LINE__, uri);
+		}
+		else
+		{
+
+			token = fdfs_http_get_parameter("token", params, param_count);
+			ts = fdfs_http_get_parameter("ts", params, param_count);
+			if (token == NULL || ts == NULL)
+			{
+				logError("file: "__FILE__", line: %d, " \
+					"expect parameter token or ts in url, " \
+					"uri: %s", __LINE__, uri);
+				OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
+				return HTTP_BADREQUEST;
+			}
+
+			timestamp = atoi(ts);
+			if ((result=fdfs_http_check_token( \
 				&g_http_params.anti_steal_secret_key, \
 				file_id_without_group, timestamp, token, \
 				g_http_params.token_ttl)) != 0)
-		{
-			logError("file: "__FILE__", line: %d, " \
+			{
+				logError("file: "__FILE__", line: %d, " \
 				"check token fail, uri: %s, " \
 				"errno: %d, error info: %s", \
 				__LINE__, uri, result, STRERROR(result));
-			if (*(g_http_params.token_check_fail_content_type))
-			{
-				response.content_length = g_http_params. \
+				if (*(g_http_params.token_check_fail_content_type))
+				{
+					response.content_length = g_http_params. \
 						token_check_fail_buff.length;
-				response.content_type = g_http_params. \
+					response.content_type = g_http_params. \
 						token_check_fail_content_type;
-				OUTPUT_HEADERS(pContext, (&response), HTTP_OK);
+					OUTPUT_HEADERS(pContext, (&response), HTTP_OK);
 
-				pContext->send_reply_chunk(pContext->arg, 1, \
-					g_http_params.token_check_fail_buff.buff, 
-					g_http_params.token_check_fail_buff.length);
+					pContext->send_reply_chunk(pContext->arg, 1, \
+						g_http_params.token_check_fail_buff.buff, 
+						g_http_params.token_check_fail_buff.length);
 
-				return HTTP_OK;
-			}
-			else
-			{
-				OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
-				return HTTP_BADREQUEST;
+					return HTTP_OK;
+				}
+				else
+				{
+					OUTPUT_HEADERS(pContext, (&response), HTTP_BADREQUEST);
+					return HTTP_BADREQUEST;
+				}
 			}
 		}
 	}

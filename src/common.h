@@ -78,6 +78,16 @@ typedef int (*FDFSSendFile)(void *arg, const char *filename, \
 
 typedef int (*FDFSProxyHandler)(void *arg, const char *dest_ip_addr);
 
+typedef struct {
+    const char *key;
+    const char *value;
+} fdfs_http_header_t;
+
+typedef struct {
+    fdfs_http_header_t *headers;
+    size_t count;
+} fdfs_http_headers_t;
+
 struct fdfs_http_resp_content_range {
 	int length;
 	char content[64];
@@ -144,7 +154,7 @@ int fdfs_mod_init();
 *	pContext the context
 * return: http status code, HTTP_OK success, != HTTP_OK fail
 */
-int fdfs_http_request_handler(struct fdfs_http_context *pContext);
+int fdfs_http_request_handler(const fdfs_http_headers_t *req_headers, struct fdfs_http_context *pContext);
 
 /**
 * format http datetime

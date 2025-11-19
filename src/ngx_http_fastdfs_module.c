@@ -24,6 +24,8 @@ static ngx_int_t ngx_http_fastdfs_proxy_process_header(ngx_http_request_t *r);
 static void *ngx_http_fastdfs_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_fastdfs_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
+	
+static fdfs_http_headers_t * ngx_http_headers_map(ngx_http_request_t *r, ngx_pool_t *pool);
 
 typedef struct {
 	ngx_http_status_t status;
@@ -1001,7 +1003,12 @@ static ngx_int_t ngx_http_fastdfs_handler(ngx_http_request_t *r)
 			r->uri.len, r->uri.data);
 	*/
 
-	return fdfs_http_request_handler(&context);
+    fdfs_http_headers_t *ngx_headers_map = ngx_http_headers_map(r, r->pool);
+    if (ngx_headers_map == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+	return fdfs_http_request_handler(ngx_headers_map, &context);
 }
 
 static char *ngx_http_fastdfs_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -1129,5 +1136,35 @@ static char * ngx_http_fastdfs_merge_loc_conf(ngx_conf_t *cf, void *parent, void
     }
 
     return NGX_CONF_OK;
+}
+
+static fdfs_http_headers_t * ngx_http_headers_map(ngx_http_request_t *r, ngx_pool_t *pool)
+{
+    ngx_list_part_t *part = &r->headers_in.headers.part;
+    ngx_table_elt_t *header = part->elts;
+    ngx_uint_t i, total = 0;
+
+    for (part = &r->headers_in.headers.part; part; part = part->next) {
+        total += part->nelts;
+    }
+
+    fdfs_http_header_t *kv_array = ngx_pcalloc(pool, total * sizeof(fdfs_http_header_t));
+    if (kv_array == NULL) return NULL;
+
+    size_t idx = 0;
+    for (part = &r->headers_in.headers.part; part; part = part->next) {
+        header = part->elts;
+        for (i = 0; i < part->nelts; i++) {
+            kv_array[idx].key   = (char *)header[i].key.data;
+            kv_array[idx].value = (char *)header[i].value.data;
+            idx++;
+        }
+    }
+
+    fdfs_http_headers_t *map = ngx_palloc(pool, sizeof(fdfs_http_headers_t));
+    if (map == NULL) return NULL;
+    map->headers = kv_array;
+    map->count = total;
+    return map;
 }
 
