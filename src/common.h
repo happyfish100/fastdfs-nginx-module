@@ -69,6 +69,7 @@ extern "C" {
 
 struct fdfs_http_response;
 
+typedef const char* (*FDFSGetRequestHeader)(void *arg, const char *name, char *value_buf, size_t buf_size);
 typedef void (*FDFSOutputHeaders)(void *arg, struct fdfs_http_response *pResponse);
 typedef int (*FDFSSendReplyChunk)(void *arg, const bool last_buff, \
 				const char *buff, const int size);
@@ -119,6 +120,7 @@ struct fdfs_http_context {
 	char *url;
 	void *arg; //for callback
 	FDFSOutputHeaders output_headers;
+	FDFSGetRequestHeader get_request_header;
 	FDFSSendFile send_file;   //nginx send file
 	FDFSSendReplyChunk send_reply_chunk;
 	FDFSProxyHandler proxy_handler; //nginx proxy handler

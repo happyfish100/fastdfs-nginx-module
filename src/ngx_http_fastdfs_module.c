@@ -254,6 +254,44 @@ static void fdfs_output_headers(void *arg, struct fdfs_http_response *pResponse)
 	}
 }
 
+static const char* fdfs_get_request_header(void *arg, const char *header_name, char *buf, size_t size)
+{
+	ngx_http_request_t *r;
+
+	r = (ngx_http_request_t *)arg;
+
+  	ngx_list_part_t *part = &r->headers_in.headers.part;
+    	ngx_table_elt_t *header = part->elts;
+
+	ngx_uint_t i;
+
+	size_t header_name_len = strlen(header_name);
+
+	for (i = 0; /* void */; i++)
+	{
+		if (i >= part->nelts)
+		{
+			if (part->next == NULL)
+		        {
+		        	break;
+                	}
+
+		        part = part->next;
+		        header = part->elts;
+		        i = 0;
+		}
+		if (header[i].key.len == header_name_len &&
+            		ngx_strncasecmp(header[i].key.data, (u_char*)bypass_header_name, header[i].key.len) == 0) {
+			size_t copy_len = (header[i].value.len < size - 1) ? header[i].value.len : size - 1;
+        		memcpy(buf, header[i].value.data, copy_len);
+        		buf[copy_len] = '\0';
+        		return buf;
+		}
+	}
+
+	return NULL;
+}
+
 static int fdfs_send_reply_chunk(void *arg, const bool last_buf,
 		const char *buff, const int size)
 {
@@ -939,6 +977,7 @@ static ngx_int_t ngx_http_fastdfs_handler(ngx_http_request_t *r)
 	context.header_only = (r->method & NGX_HTTP_HEAD) ? 1 : 0;
 	context.url = url;
 	context.output_headers = fdfs_output_headers;
+	context.get_request_header = fdfs_get_request_header;
 	context.send_file = fdfs_send_file;
 	context.send_reply_chunk = fdfs_send_reply_chunk;
 	context.proxy_handler = ngx_http_fastdfs_proxy_handler;
