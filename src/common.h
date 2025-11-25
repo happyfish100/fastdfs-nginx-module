@@ -69,7 +69,7 @@ extern "C" {
 
 struct fdfs_http_response;
 
-typedef const char* (*FDFSGetRequestHeader)(void *arg, const char *name, char *value_buf, size_t buf_size);
+typedef const char *(*FDFSGetRequestHeader)(void *arg, const string_t *name, string_t *value);
 typedef void (*FDFSOutputHeaders)(void *arg, struct fdfs_http_response *pResponse);
 typedef int (*FDFSSendReplyChunk)(void *arg, const bool last_buff, \
 				const char *buff, const int size);

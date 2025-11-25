@@ -254,41 +254,39 @@ static void fdfs_output_headers(void *arg, struct fdfs_http_response *pResponse)
 	}
 }
 
-static const char* fdfs_get_request_header(void *arg, const char *header_name, char *buf, size_t size)
+static const char *fdfs_get_request_header(void *arg, const string_t *name, string_t *value)
 {
 	ngx_http_request_t *r;
+	ngx_uint_t i;
+    ngx_list_part_t *part;
+    ngx_table_elt_t *header;
 
 	r = (ngx_http_request_t *)arg;
-
-  	ngx_list_part_t *part = &r->headers_in.headers.part;
-    	ngx_table_elt_t *header = part->elts;
-
-	ngx_uint_t i;
-
-	size_t header_name_len = strlen(header_name);
-
+  	part = &r->headers_in.headers.part;
+    header = part->elts;
 	for (i = 0; /* void */; i++)
-	{
-		if (i >= part->nelts)
-		{
-			if (part->next == NULL)
-		        {
-		        	break;
-                	}
+    {
+        if (i >= part->nelts)
+        {
+            if (part->next == NULL)
+            {
+                break;
+            }
 
-		        part = part->next;
-		        header = part->elts;
-		        i = 0;
-		}
-		if (header[i].key.len == header_name_len &&
-            		ngx_strncasecmp(header[i].key.data, (u_char*)bypass_header_name, header[i].key.len) == 0) {
-			size_t copy_len = (header[i].value.len < size - 1) ? header[i].value.len : size - 1;
-        		memcpy(buf, header[i].value.data, copy_len);
-        		buf[copy_len] = '\0';
-        		return buf;
-		}
-	}
+            part = part->next;
+            header = part->elts;
+            i = 0;
+        }
+        if ((int)header[i].key.len == name->len && ngx_strncasecmp(header[i].
+                    key.data, (u_char *)name->str, header[i].key.len) == 0)
+        {
+            FC_SET_STRING_EX(*value, (char *)header[i].value.data,
+                    header[i].value.len);
+            return value->str;
+        }
+    }
 
+    FC_SET_STRING_NULL(*value);
 	return NULL;
 }
 

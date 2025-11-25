@@ -1,4 +1,7 @@
 
+Version 1.27  2025-11-25
+ * anti-steal check bypass with specified HTTP header name and value
+
 Version 1.26  2025-11-12
  * you must upgrade your FastDFS to v6.15.1 or higher version
 

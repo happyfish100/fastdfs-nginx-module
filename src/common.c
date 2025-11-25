@@ -31,9 +31,8 @@
 #include "fastdfs/trunk_shared.h"
 #include "common.h"
 
-#define FDFS_MOD_REPONSE_MODE_PROXY	'P'
-#define FDFS_MOD_REPONSE_MODE_REDIRECT	'R'
-
+#define FDFS_MOD_REPONSE_MODE_PROXY    'P'
+#define FDFS_MOD_REPONSE_MODE_REDIRECT 'R'
 
 #define FDFS_CONTENT_TYPE_TAG_STR   "Content-type: "
 #define FDFS_CONTENT_TYPE_TAG_LEN   (sizeof(FDFS_CONTENT_TYPE_TAG_STR) - 1)
@@ -64,8 +63,10 @@ static char response_mode = FDFS_MOD_REPONSE_MODE_PROXY;
 static GroupStorePaths *group_store_paths = NULL;   //for multi groups
 static FDFSHTTPParams g_http_params;
 static int storage_sync_file_max_delay = 24 * 3600;
-static char bypass_header_name[256];
-static char bypass_header_value[256];
+static char bypass_header_name_buff[256];
+static char bypass_header_value_buff[256];
+static string_t bypass_header_name;
+static string_t bypass_header_value;
 
 static int fdfs_get_params_from_tracker();
 static int fdfs_format_http_datetime(time_t t, char *buff, const int buff_size);
@@ -153,6 +154,8 @@ int fdfs_mod_init()
 	char *pLogFilename;
 	char *pReponseMode;
 	char *pIfAliasPrefix;
+	char *bypassHeaderName;
+    char *bypassHeaderValue;
 	char buff[2 * 1024];
 	bool load_fdfs_parameters_from_tracker = false;
 
@@ -325,20 +328,22 @@ int fdfs_mod_init()
 		}
 	}
 
-	char *bypassHeader;
-	bypassHeader = iniGetStrValue(NULL, "anti_steal_bypass_header_name", \
-					&iniContext);
-	if (bypassHeader != NULL)
-	{
-		fc_safe_strcpy(bypass_header_name, bypassHeader);
+    FC_SET_STRING_EMPTY(bypass_header_name, bypass_header_name_buff);
+    FC_SET_STRING_EMPTY(bypass_header_value, bypass_header_value_buff);
 
-		char *bypassHeaderValue;
-		bypassHeaderValue = iniGetStrValue(NULL, "anti_steal_bypass_header_value", \
-					&iniContext);
-		if (bypassHeaderValue != NULL){
-			fc_safe_strcpy(bypass_header_value, bypassHeaderValue);
-		}
-	}
+	bypassHeaderName = iniGetStrValue(NULL,
+            "anti_steal_bypass_header_name", &iniContext);
+    if (bypassHeaderName != NULL) {
+        bypass_header_name.len = fc_safe_strcpy(bypass_header_name_buff,
+                bypassHeaderName);
+
+        bypassHeaderValue = iniGetStrValue(NULL,
+                "anti_steal_bypass_header_value", &iniContext);
+        if (bypassHeaderValue != NULL) {
+            bypass_header_value.len = fc_safe_strcpy(bypass_header_value_buff,
+                    bypassHeaderValue);
+        }
+    }
 
 	iniFreeContext(&iniContext);
 	if (result != 0)
@@ -369,7 +374,7 @@ int fdfs_mod_init()
 		}
 	}
 
-	logInfo("fastdfs apache / nginx module v1.26, "
+	logInfo("fastdfs apache / nginx module v1.27, "
 		"response_mode=%s, "
 		"base_path=%s, "
 		"url_have_group_name=%d, "
@@ -979,17 +984,33 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		char *token;
 		char *ts;
 		int timestamp;
+        bool need_check_token;
 
-		char val_buf[1024];
-		const char *val = pContext->get_request_header(pContext->arg, bypass_header_name, val_buf, sizeof(val_buf));
-		if (val && strcmp(val, bypass_header_value) == 0)
-		{
-			logDebug("file: " __FILE__ \
-					 ", line: %d, " \
-					 "Skip check bcz found bypass_header, uri: %s", \
-					 __LINE__, uri);
-		}
-		else
+        if (bypass_header_name.len == 0)
+        {
+            need_check_token = true;
+        }
+        else
+        {
+            string_t header_value;
+            const char *val;
+
+            val = pContext->get_request_header(pContext->arg,
+                    &bypass_header_name, &header_value);
+            if (val != NULL && fc_string_equal(&bypass_header_value, &header_value))
+            {
+                need_check_token = false;
+                logDebug("file: " __FILE__", line: %d, "
+                        "Skip check bcz found bypass_header, uri: %s",
+                        __LINE__, uri);
+            }
+            else
+            {
+                need_check_token = true;
+            }
+        }
+
+		if (need_check_token)
 		{
 			token = fdfs_http_get_parameter("token", params, param_count);
 			ts = fdfs_http_get_parameter("ts", params, param_count);
