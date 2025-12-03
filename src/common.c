@@ -46,6 +46,7 @@ static char  flv_header[] = "FLV\x1\x1\0\0\0\x9\0\0\0\x9";
 typedef struct tagGroupStorePaths {
 	char group_name[FDFS_GROUP_NAME_MAX_LEN + 1];
 	int group_name_len;
+	bool check_token;
 	int storage_server_port;
 	FDFSStorePaths store_paths;
 } GroupStorePaths;
@@ -117,6 +118,10 @@ static int fdfs_load_groups_store_paths(IniContext *pItemContext)
 				"group_name!", __LINE__, section_name);
 			return ENOENT;
 		}
+
+		group_store_paths[i].check_token = iniGetBoolValue(section_name, \
+        				"check_token", \
+        				pItemContext, false);
 
 		group_store_paths[i].storage_server_port = iniGetIntValue( \
 			section_name, "storage_server_port", pItemContext, \
@@ -856,6 +861,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 	FDFSFileInfo file_info;
 	bool bFileExists;
 	bool bSameGroup;  //if in my group
+	bool checkToken = g_http_params.anti_steal_token;
 	bool bTrunkFile;
 	FDFSTrunkFullInfo trunkInfo;
 
@@ -952,6 +958,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 				the_storage_port = group_store_paths[i]. \
 						storage_server_port;
 				bSameGroup = true;
+				checkToken = group_store_paths[i].check_token;
 				pStorePaths = &group_store_paths[i].store_paths;
 				break;
 			}
@@ -979,7 +986,7 @@ int fdfs_http_request_handler(struct fdfs_http_context *pContext)
 		return HTTP_BADREQUEST;
 	}
 
-	if (g_http_params.anti_steal_token)
+	if (g_http_params.anti_steal_token && checkToken)
 	{
 		char *token;
 		char *ts;
