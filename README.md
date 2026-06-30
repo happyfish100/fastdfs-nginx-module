@@ -1,8 +1,6 @@
-
-
 # fastdfs-nginx-module
 
-FastDFS Nginx 模块
+FastDFS Nginx 扩展模块
 
 ## 项目简介
 
@@ -17,13 +15,12 @@ fastdfs-nginx-module 是一个 Nginx 模块，用于直接通过 Nginx 访问 Fa
 - **重定向模式**：支持重定向模式，直接返回 FastDFS 存储服务器地址
 - **多组支持**：支持多个存储组配置
 - **自定义 HTTP 头**：支持自定义 HTTP 响应头
-- **文件下载回调**：支持文件下载回调处理
 
 ## 环境要求
 
-- Nginx 1.x 版本
-- FastDFS 5.x 版本
-- libfastcommon
+- Nginx 1.15及后续版本
+- FastDFS 6.x 版本，推荐V6.16
+- libfastcommon 和 libserverframe
 
 ## 安装配置
 

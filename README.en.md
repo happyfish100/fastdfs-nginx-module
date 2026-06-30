@@ -15,13 +15,12 @@ fastdfs-nginx-module is an Nginx module designed to enable direct access to file
 - **Redirect Mode**: Supports redirect mode to return the direct address of the FastDFS storage server.
 - **Multi-Group Support**: Supports configuration of multiple storage groups.
 - **Custom HTTP Headers**: Supports customization of HTTP response headers.
-- **File Download Callback**: Supports callback handling for file downloads.
 
 ## System Requirements
 
 - Nginx version 1.x
-- FastDFS version 5.x
-- libfastcommon
+- FastDFS version 6.x
+- libfastcommon and libserverframe
 
 ## Installation & Configuration
 
